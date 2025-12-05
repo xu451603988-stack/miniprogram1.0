@@ -1,0 +1,42 @@
+<view class="result-container">
+
+<!-- 标题 -->
+<view class="result-header">
+  <text class="result-title">{{diagnosisName}}</text>
+  <text class="sub-title">（{{module === 'leaf' ? '叶片' : module === 'fruit' ? '果实' : '根系'}}模块）</text>
+</view>
+
+<!-- 诊断概要 -->
+<view class="result-card">
+  <view class="card-title">📝 诊断摘要</view>
+  <view class="card-content">
+    {{diagnosisSummary}}
+  </view>
+</view>
+
+<!-- 答案展示 -->
+<view class="result-card">
+  <view class="card-title">🧩 你的回答</view>
+
+  <view class="answer-item" wx:for="{{Object.keys(answers)}}" wx:key="*this">
+    <text class="answer-key">{{item}}</text>：
+    <text class="answer-value">
+      {{ Array.isArray(answers[item]) ? answers[item].join('，') : answers[item] }}
+    </text>
+  </view>
+</view>
+
+<!-- 建议 -->
+<view class="result-card">
+  <view class="card-title">🌿 管理建议</view>
+  <view wx:for="{{suggestions}}" wx:key="*this" class="suggest-item">
+    • {{item}}
+  </view>
+</view>
+
+<!-- 按钮 -->
+<view class="btn-area">
+  <button class="btn-primary" bindtap="goHome">返回首页</button>
+  <button class="btn-light" bindtap="redo">重新诊断</button>
+</view>
+</view>

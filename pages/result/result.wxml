@@ -1,0 +1,52 @@
+<view class="container" wx:if="{{result}}">
+
+<!-- 诊断标题 -->
+<view class="diagnosis-card">
+  <view class="diagnosis-header">
+    <text class="icon">🩺</text>
+    <text class="title">{{result.diagnosis_label}}</text>
+  </view>
+
+  <view class="mechanism">
+    <text class="label">病因分析：</text>
+    <text class="content">{{result.cause_explanation}}</text>
+  </view>
+</view>
+
+<!-- 治理方案 -->
+<view class="treatment-section">
+  <view class="section-title">📋 综合治理方案</view>
+
+  <view class="treatment-card urgent">
+    <view class="treatment-title">🚨 1. 紧急处理（48小时）</view>
+    <view class="treatment-item" wx:for="{{result.treatment_recommendation.acute}}" wx:key="index">
+      <text>• {{item}}</text>
+    </view>
+  </view>
+
+  <view class="treatment-card mid">
+    <view class="treatment-title">📅 2. 中期管理（7–14天）</view>
+    <view class="treatment-item" wx:for="{{result.treatment_recommendation.mid}}" wx:key="index">
+      <text>• {{item}}</text>
+    </view>
+  </view>
+
+  <view class="treatment-card long">
+    <view class="treatment-title">🌱 3. 长期优化（年度）</view>
+    <view class="treatment-item" wx:for="{{result.treatment_recommendation.long}}" wx:key="index">
+      <text>• {{item}}</text>
+    </view>
+  </view>
+</view>
+
+<!-- 按钮 -->
+<view class="button-group">
+  <button class="back-btn" bindtap="goBack">返回首页</button>
+  <button class="re-btn" bindtap="reDiagnose">重新诊断</button>
+</view>
+
+</view>
+
+<view wx:else style="padding: 80rpx; text-align: center;">
+<text>正在生成诊断报告...</text>
+</view>

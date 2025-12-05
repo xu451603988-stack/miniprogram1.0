@@ -1,0 +1,117 @@
+{
+  "version": "leaf_weights_v1",
+  "thresholdRatio": 1.2,
+
+  "nutrition_classes": [
+    "N",
+    "P",
+    "K",
+    "Fe",
+    "Zn",
+    "Mn",
+    "B",
+    "Mg"
+  ],
+
+  "pathogen_classes": [
+    "fungal",
+    "bacterial",
+    "viral",
+    "insect",
+    "fertilizer_burn",
+    "herbicide_phytotoxic",
+    "abiotic_water"
+  ],
+
+  "features": {
+    "leaf_age_young": {
+      "nutrition": { "Fe": 2, "Zn": 1 },
+      "pathogen": { "viral": 1 }
+    },
+
+    "leaf_age_mature": {
+      "nutrition": { "N": 1 },
+      "pathogen": {}
+    },
+
+    "leaf_age_old": {
+      "nutrition": { "N": 6 },
+      "pathogen": { "fungal": 1 }
+    },
+
+    "interveinal_chlorosis": {
+      "nutrition": { "Fe": 8, "Mn": 5, "Zn": 4 },
+      "pathogen": {}
+    },
+
+    "vein_chlorosis": {
+      "nutrition": { "Fe": 6 },
+      "pathogen": { "viral": 2 }
+    },
+
+    "mottling_variegation": {
+      "nutrition": { "Zn": 2 },
+      "pathogen": { "viral": 9 }
+    },
+
+    "local_spots_lesions": {
+      "nutrition": {},
+      "pathogen": { "fungal": 6, "bacterial": 5 }
+    },
+
+    "water_soaked_spots": {
+      "nutrition": {},
+      "pathogen": { "fungal": 9, "bacterial": 6 }
+    },
+
+    "necrotic_margin": {
+      "nutrition": { "K": 8 },
+      "pathogen": { "fertilizer_burn": 6 }
+    },
+
+    "tip_burn": {
+      "nutrition": { "K": 6 },
+      "pathogen": { "fertilizer_burn": 7 }
+    },
+
+    "leaf_curl": {
+      "nutrition": { "Zn": 1, "B": 1 },
+      "pathogen": { "insect": 4, "viral": 2 }
+    },
+
+    "honeydew_sooty": {
+      "nutrition": {},
+      "pathogen": { "insect": 8 }
+    },
+
+    "insects_visible": {
+      "nutrition": {},
+      "pathogen": { "insect": 9 }
+    },
+
+    "recent_rain": {
+      "nutrition": {},
+      "pathogen": { "fungal": 4, "bacterial": 2 }
+    },
+
+    "recent_heavy_n": {
+      "nutrition": { "N": 2 },
+      "pathogen": { "fertilizer_burn": 9 }
+    },
+
+    "recent_spray": {
+      "nutrition": {},
+      "pathogen": { "herbicide_phytotoxic": 8 }
+    },
+
+    "distribution_sectoral": {
+      "nutrition": {},
+      "pathogen": { "viral": 6 }
+    },
+
+    "distribution_uniform": {
+      "nutrition": { "N": 2 },
+      "pathogen": {}
+    }
+  }
+}

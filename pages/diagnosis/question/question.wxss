@@ -1,0 +1,257 @@
+/* 页面容器 */
+.page-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f0f7f0 0%, #e6f4e6 100%);
+  padding: 30rpx 20rpx 120rpx;
+  box-sizing: border-box;
+}
+
+/* 加载状态 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.loading-text {
+  font-size: 32rpx;
+  color: #4a7c59;
+  font-weight: 500;
+}
+
+/* 进度条容器 */
+.progress-bar {
+  width: 100%;
+  height: 12rpx;
+  background: #e0e8e0;
+  border-radius: 6rpx;
+  margin-bottom: 30rpx;
+  overflow: hidden;
+  box-shadow: inset 0 1rpx 3rpx rgba(0,0,0,0.1);
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #07c160, #4cd964);
+  border-radius: 6rpx;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 10rpx rgba(7, 193, 96, 0.3);
+}
+
+/* 题目计数器 */
+.question-counter {
+  text-align: center;
+  margin-bottom: 30rpx;
+}
+
+.counter-text {
+  font-size: 28rpx;
+  color: #4a7c59;
+  font-weight: 600;
+  background: rgba(255,255,255,0.7);
+  display: inline-block;
+  padding: 10rpx 30rpx;
+  border-radius: 30rpx;
+  backdrop-filter: blur(10rpx);
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.05);
+}
+
+/* 题目卡片 */
+.question-container {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.question-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 40rpx 30rpx;
+  margin-bottom: 30rpx;
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.08);
+  border: 1rpx solid rgba(0,0,0,0.03);
+}
+
+.question-header {
+  margin-bottom: 40rpx;
+  padding-bottom: 20rpx;
+  border-bottom: 2rpx solid #f0f7f0;
+}
+
+.question-title {
+  font-size: 34rpx;
+  color: #2c3e2c;
+  font-weight: 600;
+  line-height: 1.6;
+  display: block;
+}
+
+.required-tag {
+  display: inline-block;
+  background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+  color: white;
+  font-size: 22rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  margin-left: 12rpx;
+  vertical-align: middle;
+  font-weight: 500;
+}
+
+/* 选项容器 */
+.options-container {
+  margin-top: 10rpx;
+}
+
+.radio-group, .checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.radio-wrapper, .checkbox-wrapper {
+  transition: transform 0.2s ease;
+}
+
+.radio-wrapper:active, .checkbox-wrapper:active {
+  transform: scale(0.98);
+}
+
+.radio-label, .checkbox-label {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 30rpx;
+  background: linear-gradient(135deg, #fafdfa, #f5fbf5);
+  border-radius: 16rpx;
+  border: 2rpx solid #e0e8e0;
+  transition: all 0.3s ease;
+}
+
+.radio-label:active, .checkbox-label:active {
+  background: linear-gradient(135deg, #f0f7f0, #e6f4e6);
+}
+
+/* 选中状态 */
+radio:checked + .option-label,
+checkbox:checked + .option-label {
+  color: #07c160;
+  font-weight: 600;
+}
+
+.option-label {
+  margin-left: 24rpx;
+  font-size: 30rpx;
+  color: #4a5568;
+  line-height: 1.5;
+  flex: 1;
+  transition: color 0.3s ease;
+}
+
+/* 操作按钮栏 */
+.action-bar {
+  display: flex;
+  gap: 20rpx;
+  padding: 30rpx;
+  background: #ffffff;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.08);
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.btn-secondary, .btn-primary {
+  flex: 1;
+  padding: 28rpx 40rpx;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+}
+
+.btn-secondary {
+  color: #4a7c59;
+  background: #f0f7f0;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.05);
+}
+
+.btn-secondary:hover {
+  background: #e6f4e6;
+}
+
+.btn-primary {
+  color: #ffffff;
+  background: linear-gradient(135deg, #07c160, #4cd964);
+  box-shadow: 0 4rpx 16rpx rgba(7, 193, 96, 0.3);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #06b050, #3bc754);
+  transform: translateY(-2rpx);
+  box-shadow: 0 6rpx 20rpx rgba(7, 193, 96, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2rpx 8rpx rgba(7, 193, 96, 0.3);
+}
+
+/* 禁用状态 */
+button[disabled] {
+  opacity: 0.6;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 淡入动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 响应式适配 */
+@media (min-width: 768px) {
+  .page-container {
+    padding: 40rpx 60rpx 140rpx;
+  }
+  
+  .question-card {
+    padding: 50rpx 40rpx;
+  }
+  
+  .question-title {
+    font-size: 36rpx;
+  }
+  
+  .option-label {
+    font-size: 32rpx;
+  }
+}
+
+/* 暗色模式支持（可选） */
+@media (prefers-color-scheme: dark) {
+  .page-container {
+    background: linear-gradient(135deg, #1a2a1a, #152015);
+  }
+  
+  .question-card {
+    background: #2a3a2a;
+    border-color: rgba(255,255,255,0.1);
+  }
+  
+  .question-title {
+    color: #e0f0e0;
+  }
+  
+  .radio-label, .checkbox-label {
+    background: linear-gradient(135deg, #2a3a2a, #253525);
+    border-color: #3a4a3a;
+  }
+}
