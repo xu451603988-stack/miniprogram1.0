@@ -1,42 +1,78 @@
-<view class="result-container">
+<!-- miniprogram/pages/diagnosis/result/result.wxml -->
 
-<!-- 标题 -->
-<view class="result-header">
-  <text class="result-title">{{diagnosisName}}</text>
-  <text class="sub-title">（{{module === 'leaf' ? '叶片' : module === 'fruit' ? '果实' : '根系'}}模块）</text>
+<view class="page-container">
+
+<!-- 加载中 -->
+<view wx:if="{{loading}}" class="loading-box">
+  <text class="loading-text">正在生成诊断报告...</text>
 </view>
 
-<!-- 诊断概要 -->
-<view class="result-card">
-  <view class="card-title">📝 诊断摘要</view>
-  <view class="card-content">
-    {{diagnosisSummary}}
+<!-- 结果内容 -->
+<view wx:elif="{{analysis}}" class="result-container">
+
+  <!-- 标题 -->
+  <view class="title-box">
+    <text class="title-text">{{moduleName}}</text>
+    <text class="subtitle">作物：柑橘 · 月份：{{rawData.month}} 月</text>
   </view>
-</view>
 
-<!-- 答案展示 -->
-<view class="result-card">
-  <view class="card-title">🧩 你的回答</view>
+  <!-- 风险评分 -->
+  <view class="card risk-card">
+    <text class="card-title">总风险指数</text>
+    <text class="risk-score">{{analysis.riskScore}} / 100</text>
 
-  <view class="answer-item" wx:for="{{Object.keys(answers)}}" wx:key="*this">
-    <text class="answer-key">{{item}}</text>：
-    <text class="answer-value">
-      {{ Array.isArray(answers[item]) ? answers[item].join('，') : answers[item] }}
-    </text>
+    <view class="risk-level {{analysis.riskLevelClass}}">
+      {{analysis.riskLevelText}}
+    </view>
   </view>
-</view>
 
-<!-- 建议 -->
-<view class="result-card">
-  <view class="card-title">🌿 管理建议</view>
-  <view wx:for="{{suggestions}}" wx:key="*this" class="suggest-item">
-    • {{item}}
+  <!-- 风险项 -->
+  <view class="card">
+    <text class="card-title">主要风险因素</text>
+
+    <block wx:for="{{analysis.mainRisks}}" wx:key="idx">
+      <view class="risk-item">
+        <text class="risk-dot"></text>
+        <text>{{item}}</text>
+      </view>
+    </block>
   </view>
+
+  <!-- 营养诊断 -->
+  <view class="card">
+    <text class="card-title">营养诊断</text>
+
+    <block wx:for="{{analysis.nutrientFindings}}" wx:key="idx">
+      <view class="bullet"><text>•</text> {{item}}</view>
+    </block>
+  </view>
+
+  <!-- 病害诊断 -->
+  <view class="card">
+    <text class="card-title">病害诊断</text>
+
+    <block wx:if="{{analysis.diseaseFindings.length > 0}}">
+      <block wx:for="{{analysis.diseaseFindings}}" wx:key="idx">
+        <view class="bullet"><text>•</text> {{item}}</view>
+      </block>
+    </block>
+    <text wx:else>未发现明确病害迹象</text>
+  </view>
+
+  <!-- 管理建议 -->
+  <view class="card advice-card">
+    <text class="card-title">综合管理建议</text>
+
+    <block wx:for="{{analysis.suggestions}}" wx:key="idx">
+      <view class="advice-item">{{idx + 1}}. {{item}}</view>
+    </block>
+  </view>
+
+  <!-- 按钮 -->
+  <view class="btn-box">
+    <button class="btn-primary" bindtap="redo">重新诊断</button>
+  </view>
+
 </view>
 
-<!-- 按钮 -->
-<view class="btn-area">
-  <button class="btn-primary" bindtap="goHome">返回首页</button>
-  <button class="btn-light" bindtap="redo">重新诊断</button>
-</view>
 </view>
