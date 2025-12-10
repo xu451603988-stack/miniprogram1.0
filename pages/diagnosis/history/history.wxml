@@ -1,0 +1,40 @@
+<view class="page">
+  <view class="header">
+    <text class="header-title">诊断历史记录</text>
+    <button class="header-btn" bindtap="clearAll" wx:if="{{records.length > 0}}">清空</button>
+  </view>
+
+  <view wx:if="{{records.length === 0}}" class="empty">
+    <text class="empty-title">暂无诊断记录</text>
+    <text class="empty-sub">完成一次诊断并点击“保存诊断记录”后，可在这里查看历史结果。</text>
+  </view>
+
+  <scroll-view wx:if="{{records.length > 0}}" scroll-y="true" class="list">
+    <block wx:for="{{records}}" wx:key="id">
+      <view class="card">
+        <view class="card-header">
+          <view class="card-header-left">
+            <text class="crop">{{item.displayCrop}}</text>
+            <view class="tags">
+              <text wx:if="{{item.mainSeverityLabel}}" class="tag severity {{item.mainSeverityClass}}">
+                {{item.mainSeverityLabel}}
+              </text>
+              <text wx:if="{{item.mainModuleName}}" class="tag subtle">
+                {{item.mainModuleName}}
+              </text>
+            </view>
+          </view>
+          <text class="time">{{item.time}}</text>
+        </view>
+
+        <view class="card-body">
+          <text class="summary-text" user-select="true">{{item.summary}}</text>
+        </view>
+
+        <view wx:if="{{item.systemBrief}}" class="card-footer">
+          <text class="footer-text">系统风险概览：{{item.systemBrief}}</text>
+        </view>
+      </view>
+    </block>
+  </scroll-view>
+</view>

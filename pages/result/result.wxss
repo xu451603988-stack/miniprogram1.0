@@ -1,0 +1,38 @@
+/* pages/orangeForm/orangeForm.wxss */
+.container { padding: 30rpx; background: #f5f5f5; min-height: 100vh; }
+.form-title { font-size: 36rpx; font-weight: bold; color: #2d8c2d; text-align: center; margin: 30rpx 0 40rpx; }
+.question { background: white; padding: 30rpx; border-radius: 15rpx; margin-bottom: 30rpx; box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.1); }
+.question-text { font-size: 30rpx; font-weight: bold; color: #333; margin-bottom: 25rpx; padding-left: 10rpx; border-left: 6rpx solid #2d8c2d; }
+.option { display: block; font-size: 26rpx; color: #555; margin-bottom: 20rpx; padding: 15rpx; background: #f9f9f9; border-radius: 8rpx; }
+.option radio, .option checkbox { margin-right: 15rpx; transform: scale(0.8); }
+.submit-btn { width: 90%; background: linear-gradient(135deg, #2d8c2d, #1a7346); color: white; font-size: 32rpx; padding: 25rpx 0; border-radius: 60rpx; margin: 40rpx auto 20rpx; box-shadow: 0 6rpx 20rpx rgba(45,140,45,0.3); }
+.submit-btn::after { border: none; }
+
+/* pages/result/result.wxss */
+.container { padding: 30rpx; background: #f5f5f5; min-height: 100vh; }
+.diagnosis-card { background: linear-gradient(135deg, #2d8c2d, #1a7346); border-radius: 20rpx; padding: 40rpx; margin-bottom: 30rpx; color: white; }
+.diagnosis-header { text-align: center; margin-bottom: 30rpx; }
+.icon { font-size: 60rpx; display: block; margin-bottom: 10rpx; }
+.title { font-size: 36rpx; font-weight: bold; display: block; margin-bottom: 10rpx; }
+.code { font-size: 24rpx; opacity: 0.8; }
+.mechanism { margin-top: 30rpx; padding: 20rpx; background: rgba(255,255,255,0.1); border-radius: 10rpx; }
+.mechanism .label { font-weight: bold; display: block; margin-bottom: 10rpx; }
+.mechanism .content { line-height: 1.6; }
+.score-section { margin: 30rpx 0; }
+.section-title { font-size: 32rpx; font-weight: bold; color: #333; margin-bottom: 25rpx; padding-left: 15rpx; border-left: 8rpx solid #2d8c2d; }
+.score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15rpx; }
+.score-item { background: white; padding: 20rpx; border-radius: 10rpx; text-align: center; box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.1); }
+.score-item .code { font-size: 24rpx; font-weight: bold; color: #2d8c2d; display: block; }
+.score-item .score { font-size: 28rpx; color: #333; }
+.treatment-section { margin-bottom: 40rpx; }
+.treatment-card { background: white; border-radius: 15rpx; padding: 30rpx; margin-bottom: 25rpx; box-shadow: 0 4rpx 15rpx rgba(0,0,0,0.08); border-left: 8rpx solid; }
+.treatment-card.urgent { border-color: #ff6b6b; }
+.treatment-card.mid { border-color: #4ecdc4; }
+.treatment-card.long { border-color: #95e1d3; }
+.treatment-title { font-size: 28rpx; font-weight: bold; color: #333; margin-bottom: 20rpx; display: block; }
+.treatment-item { font-size: 26rpx; color: #555; line-height: 1.6; margin-bottom: 15rpx; display: block; }
+.button-group { display: flex; gap: 20rpx; padding: 0 20rpx; margin-top: 40rpx; }
+.back-btn, .re-btn { flex: 1; padding: 25rpx 0; border-radius: 50rpx; font-size: 28rpx; }
+.back-btn { background: #2d8c2d; color: white; }
+.re-btn { background: white; color: #2d8c2d; border: 2rpx solid #2d8c2d; }
+.back-btn::after, .re-btn::after { border: none; }

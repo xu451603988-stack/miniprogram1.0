@@ -1,0 +1,136 @@
+<view class="result-page">
+
+<!-- 标题 -->
+<view class="header">
+  <text class="title">诊断结果</text>
+</view>
+
+<!-- 总结 -->
+<view class="section">
+  <view class="section-title">总结</view>
+  <view class="section-content">
+    <text>{{summary}}</text>
+  </view>
+</view>
+
+<!-- 建议 -->
+<view class="section" wx:if="{{suggestions && suggestions.length > 0}}">
+  <view class="section-title">建议</view>
+  <view class="section-content">
+    <block wx:for="{{suggestions}}" wx:key="index">
+      <view class="suggestion-item">
+        <text>{{item}}</text>
+      </view>
+    </block>
+  </view>
+</view>
+
+<!-- 单模块模式：直接显示 finalCode 对应的详情（如果有） -->
+<view wx:if="{{!isCombined}}">
+  <view class="section" wx:if="{{details && details.length > 0}}">
+    <view class="section-title">详细分析</view>
+    <view class="section-content">
+      <block wx:for="{{details}}" wx:key="index">
+        <view class="detail-item">
+          <text>{{item}}</text>
+        </view>
+      </block>
+    </view>
+  </view>
+</view>
+
+<!-- 组合模式：分模块展示 -->
+<view wx:if="{{isCombined}}">
+
+  <!-- 叶片模块 -->
+  <view class="section" wx:if="{{leaf}}">
+    <view class="section-title">叶片诊断</view>
+    <view class="section-content">
+      <text>{{leaf.summary}}</text>
+
+      <block wx:if="{{leaf.details && leaf.details.length > 0}}">
+        <view class="sub-title">详细分析</view>
+        <block wx:for="{{leaf.details}}" wx:key="index">
+          <view class="detail-item">
+            <text>{{item}}</text>
+          </view>
+        </block>
+      </block>
+
+      <block wx:if="{{leaf.suggestions && leaf.suggestions.length > 0}}">
+        <view class="sub-title">建议</view>
+        <block wx:for="{{leaf.suggestions}}" wx:key="index">
+          <view class="suggestion-item">
+            <text>{{item}}</text>
+          </view>
+        </block>
+      </block>
+    </view>
+  </view>
+
+  <!-- 果实模块 -->
+  <view class="section" wx:if="{{fruit}}">
+    <view class="section-title">果实诊断</view>
+    <view class="section-content">
+      <text>{{fruit.summary}}</text>
+
+      <block wx:if="{{fruit.details && fruit.details.length > 0}}">
+        <view class="sub-title">详细分析</view>
+        <block wx:for="{{fruit.details}}" wx:key="index">
+          <view class="detail-item">
+            <text>{{item}}</text>
+          </view>
+        </block>
+      </block>
+
+      <block wx:if="{{fruit.suggestions && fruit.suggestions.length > 0}}">
+        <view class="sub-title">建议</view>
+        <block wx:for="{{fruit.suggestions}}" wx:key="index">
+          <view class="suggestion-item">
+            <text>{{item}}</text>
+          </view>
+        </block>
+      </block>
+    </view>
+  </view>
+
+  <!-- 根系模块 -->
+  <view class="section" wx:if="{{root}}">
+    <view class="section-title">根系诊断</view>
+
+    <view wx:if="{{rootSkipped}}" class="section-content">
+      <text>根系整体健康，因此自动跳过根系详细诊断。</text>
+    </view>
+
+    <view class="section-content" wx:elif="{{!rootSkipped}}">
+      <text>{{root.summary}}</text>
+
+      <block wx:if="{{root.details && root.details.length > 0}}">
+        <view class="sub-title">详细分析</view>
+        <block wx:for="{{root.details}}" wx:key="index">
+          <view class="detail-item">
+            <text>{{item}}</text>
+          </view>
+        </block>
+      </block>
+
+      <block wx:if="{{root.suggestions && root.suggestions.length > 0}}">
+        <view class="sub-title">建议</view>
+        <block wx:for="{{root.suggestions}}" wx:key="index">
+          <view class="suggestion-item">
+            <text>{{item}}</text>
+          </view>
+        </block>
+      </block>
+    </view>
+  </view>
+
+</view>
+
+<!-- 底部按钮 -->
+<view class="bottom-buttons">
+  <button class="btn-primary" bindtap="retest">重新测试</button>
+  <button class="btn-secondary" bindtap="goHome">返回首页</button>
+</view>
+
+</view>

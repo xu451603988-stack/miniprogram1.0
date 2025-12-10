@@ -1,0 +1,97 @@
+<view class="page">
+
+<!-- 顶部 Summary 卡片 -->
+<view class="summary-card">
+  <view class="summary-top-row">
+    <text class="summary-title">诊断结果</text>
+
+    <view wx:if="{{summaryStatusLabel}}" class="summary-pill pill-{{summaryStatusClass}}">
+      <text class="summary-pill-text">{{summaryStatusLabel}}</text>
+    </view>
+  </view>
+
+  <text class="summary-desc">
+    {{summary || '本次巡诊未发现明显异常，整体状况稳定'}}
+  </text>
+</view>
+
+<!-- 可滚动内容区 -->
+<scroll-view scroll-y="true" class="scroll-area">
+
+  <!-- 叶片、果实、根系模块（用 data 里的 leaf/fruit/root 渲染） -->
+  <view class="section-card card-animate" wx:if="{{leaf}}">
+    <view class="section-header">
+      <view class="section-header-left">
+        <view class="icon-circle icon-leaf">🌿</view>
+        <text class="section-title">叶片诊断</text>
+      </view>
+      <view class="severity-tag severity-{{leaf.severityClass}}">
+        <text>{{leaf.severityLabel}}</text>
+      </view>
+    </view>
+    <view class="section-body">
+      <text class="main-text">{{leaf.reason}}</text>
+      <view class="advice-block">
+        <text class="advice-title">管理建议</text>
+        <text class="advice-text">{{leaf.advice}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-card card-animate" wx:if="{{fruit && fruit.enabled}}">
+    <view class="section-header">
+      <view class="section-header-left">
+        <view class="icon-circle icon-fruit">🍊</view>
+        <text class="section-title">果实诊断</text>
+      </view>
+      <view class="severity-tag severity-{{fruit.severityClass}}">
+        <text>{{fruit.severityLabel}}</text>
+      </view>
+    </view>
+    <view class="section-body">
+      <text class="main-text">{{fruit.reason}}</text>
+      <view class="advice-block">
+        <text class="advice-title">管理建议</text>
+        <text class="advice-text">{{fruit.advice}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-card card-animate" wx:if="{{root}}">
+    <view class="section-header">
+      <view class="section-header-left">
+        <view class="icon-circle icon-root">🌱</view>
+        <text class="section-title">根系诊断</text>
+      </view>
+      <view class="severity-tag severity-{{root.severityClass}}">
+        <text>{{root.severityLabel}}</text>
+      </view>
+    </view>
+    <view class="section-body">
+      <text class="main-text">{{root.reason}}</text>
+      <view class="advice-block">
+        <text class="advice-title">管理建议</text>
+        <text class="advice-text">{{root.advice}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 综合提示 -->
+  <view class="info-box">
+    <text>
+      本报告为现场问卷诊断结果，仅作为生产管理参考。实际管理时请结合当地气候、土壤与品种情况，
+      如遇严重或持续性问题，可联系植保医生进行现场查看。
+    </text>
+  </view>
+
+</scroll-view>
+
+<!-- 底部操作区：更像天猫/京东质检 -->
+<view class="footer-actions">
+  <button class="btn-primary" bindtap="saveRecord">保存诊断</button>
+  <button class="btn-secondary" bindtap="goHistory">历史记录</button>
+  <button class="btn-secondary" bindtap="contactDoctor">联系植保医生</button>
+  <button class="btn-plain" bindtap="retest">重新诊断</button>
+</view>
+
+</view>
