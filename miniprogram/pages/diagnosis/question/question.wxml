@@ -1,0 +1,79 @@
+<view class="page-container" wx:if="{{isInitialized}}">
+
+<!-- 进度条 -->
+<view class="progress-bar">
+  <view class="progress-fill" style="width: {{progress}}%;"></view>
+</view>
+
+<!-- 题目内容 -->
+<view class="question-container">
+
+  <view class="question-title">
+    {{currentQuestion + 1}} / {{totalQuestions}}. {{questions[currentQuestion].title}}
+  </view>
+
+  <!-- 单选题 -->
+  <radio-group
+    wx:if="{{questions[currentQuestion].type === 'single'}}"
+    class="option-group"
+    bindchange="onOptionSelect"
+  >
+    <block wx:for="{{questions[currentQuestion].options}}" wx:key="value">
+      <label class="option-item {{isSingleSelected(item.value) ? 'option-item-active' : ''}}">
+        <radio
+          value="{{item.value}}"
+          checked="{{isSingleSelected(item.value)}}"
+          data-qid="{{questions[currentQuestion].id}}"
+          data-value="{{item.value}}"
+        />
+        <text class="option-text">{{item.label}}</text>
+      </label>
+    </block>
+  </radio-group>
+
+  <!-- 多选题 -->
+  <checkbox-group
+    wx:elif="{{questions[currentQuestion].type === 'multiple' || questions[currentQuestion].type === 'multi'}}"
+    class="option-group"
+    bindchange="onOptionToggle"
+  >
+    <block wx:for="{{questions[currentQuestion].options}}" wx:key="value">
+      <label class="option-item {{isMultiSelected(item.value) ? 'option-item-active' : ''}}">
+        <checkbox
+          value="{{item.value}}"
+          checked="{{isMultiSelected(item.value)}}"
+          data-qid="{{questions[currentQuestion].id}}"
+          data-value="{{item.value}}"
+        />
+        <text class="option-text">{{item.label}}</text>
+      </label>
+    </block>
+  </checkbox-group>
+
+</view>
+
+<!-- 底部按钮 -->
+<view class="bottom-buttons">
+  <button
+    class="btn-secondary"
+    wx:if="{{currentQuestion > 0}}"
+    bindtap="goBack"
+  >
+    上一题
+  </button>
+
+  <button
+    class="btn-primary"
+    bindtap="nextQuestion"
+    disabled="{{!canGoNext}}"
+  >
+    下一题
+  </button>
+</view>
+
+</view>
+
+<!-- 加载中 -->
+<view wx:else class="loading-container">
+<text class="loading-text">正在加载问卷...</text>
+</view>
