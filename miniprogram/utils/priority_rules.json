@@ -1,0 +1,59 @@
+{
+  "version": "priority_rules_v1",
+
+  "disease_priority": [
+    "fruit_fly",
+    "bacterial_soft_rot",
+    "canker",
+    "greasy_spot",
+    "melanose",
+    "septoria",
+    "viral"
+  ],
+
+  "physio_priority": [
+    "sunburn",
+    "cracking_water_imbalance",
+    "calcium_deficiency",
+    "ethylene_induced_drop",
+    "HLB_physiology"
+  ],
+
+  "leaf_pathogen_priority": [
+    "insect",
+    "bacterial",
+    "fungal",
+    "viral",
+    "fertilizer_burn",
+    "herbicide_phytotoxic",
+    "abiotic_water"
+  ],
+
+  "leaf_nutrition_priority": [
+    "Fe",
+    "Zn",
+    "Mn",
+    "K",
+    "N",
+    "Mg",
+    "B",
+    "P"
+  ],
+
+  "general_rules": {
+    "force_insect_if_visible": {
+      "feature_key": "insects_visible",
+      "winner": "insect"
+    },
+
+    "force_fruit_fly_if_larvae": {
+      "feature_key": "visible_holes_or_larvae",
+      "winner": "fruit_fly"
+    },
+
+    "force_bacterial_soft_rot_if_overnight": {
+      "feature_key": "onset_overnight",
+      "winner": "bacterial_soft_rot"
+    }
+  }
+}

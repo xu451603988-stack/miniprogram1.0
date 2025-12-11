@@ -1,0 +1,62 @@
+{
+  "version": "phenology_v1",
+
+  "mapping": {
+    "1": "overwinter",
+    "2": "budding",
+    "3": "budding_flowering",
+    "4": "flowering_fruit_drop",
+    "5": "fruit_drop_summer_rain",
+    "6": "summer_rain",
+    "7": "flower_induction",
+    "8": "autumn_flush",
+    "9": "autumn_flush",
+    "10": "fruit_expansion",
+    "11": "fruit_expansion",
+    "12": "overwinter"
+  },
+
+  "corrections": {
+    "overwinter": {
+      "fungal": 0.8,
+      "bacterial": 0.8,
+      "viral": 1.0,
+      "insect": 0.9,
+      "cracking_water_imbalance": 1.0,
+      "sunburn": 0.6,
+      "HLB_physiology": 1.0,
+      "N": 1.0,
+      "Fe": 0.5
+    },
+
+    "summer_rain": {
+      "fungal": 1.7,
+      "bacterial": 1.3,
+      "viral": 1.0,
+      "insect": 1.0,
+      "cracking_water_imbalance": 1.3,
+      "sunburn": 1.1
+    },
+
+    "fruit_expansion": {
+      "fungal": 1.2,
+      "bacterial": 1.0,
+      "viral": 0.9,
+      "insect": 1.0,
+      "cracking_water_imbalance": 1.5,
+      "sunburn": 1.4,
+      "HLB_physiology": 1.2
+    },
+
+    "fruit_drop_summer_rain": {
+      "fungal": 1.4,
+      "bacterial": 1.2,
+      "abiotic_water": 1.3
+    },
+
+    "autumn_flush": {
+      "viral": 1.6,
+      "insect": 1.2
+    }
+  }
+}
