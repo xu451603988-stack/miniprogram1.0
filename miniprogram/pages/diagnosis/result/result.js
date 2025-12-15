@@ -1,204 +1,221 @@
-// miniprogram/pages/diagnosis/result/result.js
-// V5.0 结果渲染层
-// 核心职责：读取诊断Code -> 查阅专家库 -> 生成“表象+体质”综合报告
-
+// pages/diagnosis/result/result.js
 const app = getApp();
-// 引入专家知识库 (路径需对应)
-const diagnosisDB = require('../../../data/diagnosis_knowledge.js');
 
 Page({
+
+  /**
+   * 页面的初始数据
+   */
   data: {
-    resultType: '', // 标记结果版本 ('combined' | 'decision_tree_v5')
-    report: null,   // 用于页面渲染的最终报告数据
+    isLoading: true, // 加载状态
+    resultId: null, // 诊断记录ID
     
-    // ... 保留部分旧数据字段以防万一 ...
-    isCombined: false 
+    // 诊断结果核心数据对象 (默认空结构，防止渲染报错)
+    result: {
+      diseaseName: '',     // 病害名称 (如：柑橘红蜘蛛)
+      probability: 0,      // 置信度/相似度 (0-100)
+      severity: '',        // 严重程度 (轻度/中度/重度)
+      imageUrl: '',        // 诊断的原图
+      featureDesc: '',     // 症状描述
+      
+      // 核心分析：结合你提到的“药害/肥害/根系/卷叶”等多维度
+      analysis: [],        // 数组，例如 ["叶片主要呈现反卷", "疑似伴有轻微药害"]
+      
+      // 解决方案：分为 农业防治(物理) 和 化学防治(药剂)
+      solutions: {
+        agricultural: [], // 农业/物理防治建议
+        chemical: [],     // 化学药剂建议
+        prevention: ''    // 治未病/日常养护建议
+      }
+    },
+
+    // 推荐产品列表 (可关联商城)
+    recommendProducts: [] 
   },
 
   /**
-   * 页面加载
+   * 生命周期函数--监听页面加载
    */
-  onLoad(options) {
-    console.log("【结果页】收到参数:", options);
+  onLoad: function (options) {
+    this.setData({ isLoading: true });
 
-    if (!options.result) {
-      wx.showToast({ title: '数据缺失', icon: 'none' });
-      return;
-    }
-
-    let parsed = {};
-    try {
-      // 解码传递过来的 JSON 字符串
-      parsed = JSON.parse(decodeURIComponent(options.result));
-    } catch (e) {
-      console.error("解析失败:", e);
-      return;
-    }
-
-    // 记录结果类型
-    this.setData({ resultType: parsed.type });
-
-    // 分流处理：如果是 V5 新版引擎生成的
-    if (parsed.type === 'decision_tree_v5') {
-      this.initV5Result(parsed);
+    // 场景1：如果有 id，从服务器获取详情
+    if (options.id) {
+      this.setData({ resultId: options.id });
+      this.fetchDiagnosisResult(options.id);
     } 
-    // 兼容旧版逻辑 (保留原有代码逻辑，防止旧入口报错)
+    // 场景2：如果上一页直接传了编码后的对象 (适用于离线或快速展示)
+    else if (options.data) {
+      try {
+        const resultData = JSON.parse(decodeURIComponent(options.data));
+        this.setData({ 
+          result: resultData,
+          isLoading: false 
+        });
+      } catch (e) {
+        console.error("解析数据失败", e);
+        this.showError("数据解析错误");
+      }
+    } 
+    // 场景3：开发调试用 (当没有参数时加载模拟数据)
     else {
-      // 这里可以保留您原来的 processCombined 或 processSingle 逻辑
-      // 或者直接提示“旧版数据”
-      this.initCompatibleResult(parsed);
+      // TODO: 正式上线请注释掉此行
+      this.mockDebugData();
     }
   },
 
   /**
-   * V5.0 核心渲染逻辑
-   * 将“病害”与“体质”拼接，生成像中医处方一样的报告
+   * 模拟数据 (用于开发阶段调试 UI)
    */
-  initV5Result(data) {
-    const diseaseCode = data.diagnosis || 'unknown'; // 主病代码 (如 aphid)
-    const rootCode = data.rootStatus || 'normal';    // 体质代码 (如 damp_heat)
+  mockDebugData: function() {
+    console.warn("⚠️ 正在使用模拟数据");
+    setTimeout(() => {
+      this.setData({
+        isLoading: false,
+        result: {
+          diseaseName: '柑橘黄龙病 (疑似)',
+          probability: 88.5,
+          severity: '中度',
+          imageUrl: 'https://via.placeholder.com/300x300?text=Citrus+Leaf', // 替换为你的测试图
+          featureDesc: '叶片呈现斑驳状黄化，且左右不对称；叶脉肿大。',
+          analysis: [
+            '叶片主要呈现斑驳黄化',
+            '根系活力可能受损',
+            '需排查是否存在线虫影响'
+          ],
+          solutions: {
+            agricultural: [
+              '严格管控病树，发现确诊立即挖除。',
+              '加强对木虱的监测与防控。'
+            ],
+            chemical: [
+              '选用高效氯氰菊酯进行木虱消杀。',
+              '补充锌、铁等微量元素叶面肥。'
+            ],
+            prevention: '核心在于“治未病”，需常年监测果园木虱基数，提升树体自身抗性。'
+          }
+        }
+      });
+    }, 1000);
+  },
+
+  /**
+   * 从服务器获取诊断结果 API
+   */
+  fetchDiagnosisResult: function (id) {
+    const that = this;
+    // 模拟网络请求
+    // wx.request({
+    //   url: app.globalData.apiUrl + '/diagnosis/detail/' + id,
+    //   method: 'GET',
+    //   success: (res) => {
+    //     if (res.data.code === 200) {
+    //       that.setData({
+    //         result: res.data.data,
+    //         isLoading: false
+    //       });
+    //     } else {
+    //       that.showError(res.data.msg);
+    //     }
+    //   },
+    //   fail: () => {
+    //     that.showError("网络请求失败");
+    //   }
+    // });
     
-    console.log(`正在生成报告: 病害[${diseaseCode}] + 体质[${rootCode}]`);
+    // 暂时直接调用模拟数据替代 API
+    this.mockDebugData();
+  },
 
-    // 1. 查阅知识库
-    const diseaseEntry = diagnosisDB[diseaseCode] || diagnosisDB['unknown'];
-    const constitutionEntry = diagnosisDB['_constitutions'] ? diagnosisDB['_constitutions'][rootCode] : null;
-
-    // 防御性检查：如果没有体质库，给个默认值
-    const rootInfo = constitutionEntry || { 
-      title: "根系状况未知", 
-      desc: "未检测到明显的根际异常。", 
-      action: "维持常规管理。" 
-    };
-
-    // 2. 动态组合【调理方案】
-    // 方案 = 病害急救方案 (标) + 体质调理方案 (本)
-    let combinedSolutions = [];
-    
-    // 先加病害方案 (如杀虫/杀菌)
-    if (diseaseEntry.solutions) {
-      combinedSolutions = [...diseaseEntry.solutions];
-    }
-
-    // 再加体质方案 (如果体质异常)
-    if (rootCode !== 'normal') {
-      combinedSolutions.push({
-        type: "系统固本", // 标签名
-        content: `【针对${rootInfo.title}】：${rootInfo.action}`
+  /**
+   * 图片预览
+   */
+  onPreviewImage: function () {
+    if (this.data.result.imageUrl) {
+      wx.previewImage({
+        urls: [this.data.result.imageUrl]
       });
     }
-
-    // 3. 动态组合【辨证逻辑】文案
-    // 逻辑 = 为什么确诊这个病 + 根部查到了什么
-    let logicText = diseaseEntry.logic || "根据您的症状描述推导得出。";
-    if (rootCode !== 'normal') {
-      logicText += `\n\n【系统查本】：${rootInfo.desc}`;
-    }
-
-    // 4. 生成标签 (Tags)
-    // 合并病害标签和体质标签
-    let displayTags = diseaseEntry.tags || [];
-    if (rootCode !== 'normal') {
-      // 取体质标题的前两个字做标签 (如 "湿热")
-      displayTags.push(rootInfo.title.substring(0, 2)); 
-    }
-
-    // 5. 构造最终渲染对象
-    const report = {
-      title: diseaseEntry.name, // 大标题 (如 蚜虫危害)
-      severity: diseaseEntry.severity, // 风险等级 (控制卡片颜色)
-      severityLabel: this.getSeverityLabel(diseaseEntry.severity),
-      
-      tags: displayTags,
-      logic: logicText,
-      solutions: combinedSolutions,
-      
-      // 辅助信息
-      time: new Date().toLocaleString()
-    };
-
-    this.setData({ report });
-    
-    // 自动保存到历史记录 (可选)
-    this.saveToHistoryAuto(report, data);
   },
 
   /**
-   * 辅助：获取风险等级文案
+   * 点击咨询专家
    */
-  getSeverityLabel(level) {
-    const map = {
-      'severe': '高风险 · 需重视',
-      'moderate': '中风险 · 需干预',
-      'mild': '低风险 · 需观察'
-    };
-    return map[level] || '风险未知';
+  onConsultExpert: function () {
+    wx.navigateTo({
+      url: '/pages/expert/chat/chat?disease=' + this.data.result.diseaseName,
+      fail: () => {
+        // 如果没有专家页，则弹窗提示或拨打电话
+        wx.showModal({
+          title: '专家服务',
+          content: '即将为您接通植保专家热线：400-XXX-XXXX',
+          confirmText: '拨打',
+          success(res) {
+            if (res.confirm) {
+              wx.makePhoneCall({ phoneNumber: '13800000000' });
+            }
+          }
+        });
+      }
+    });
   },
 
   /**
-   * 兼容旧版 (可选，为了不让旧代码报错)
+   * 保存结果/生成海报
    */
-  initCompatibleResult(data) {
-    this.setData({
-      isCombined: true,
-      summary: "本次诊断使用旧版数据格式，建议重新测试以获取精准报告。",
-      leaf: { enabled: false },
-      fruit: { enabled: false },
-      root: { enabled: false }
+  onSaveResult: function () {
+    wx.showToast({
+      title: '生成海报中...',
+      icon: 'loading'
+    });
+    // 这里可以接入 canvas 绘图逻辑生成海报
+    setTimeout(() => {
+      wx.hideToast();
+      wx.showToast({ title: '保存成功' });
+    }, 1000);
+  },
+
+  /**
+   * 返回首页
+   */
+  onBackHome: function () {
+    wx.switchTab({
+      url: '/pages/index/index', // 确保这是你的 tabbar 首页路径
+      fail: () => {
+        wx.reLaunch({ url: '/pages/index/index' });
+      }
+    });
+  },
+
+  /**
+   * 再次诊断
+   */
+  onRetry: function() {
+    wx.navigateBack({
+      delta: 1
     });
   },
 
   /**
-   * 自动保存历史记录
+   * 错误提示辅助函数
    */
-  saveToHistoryAuto(report, rawData) {
-    const historyItem = {
-      id: Date.now(),
-      time: new Date().toLocaleString(),
-      summary: report.title, // 列表页显示标题
-      mainSeverityClass: report.severity, // 列表页显示颜色
-      systemBrief: report.tags.join(' · '), // 列表页显示标签
-      result: { // 保存完整数据以便回看
-        summary: {
-          mainModule: 'leaf', // 兼容旧字段
-          hasIssue: true
-        },
-        type: 'decision_tree_v5',
-        report: report
-      }
-    };
-
-    let list = wx.getStorageSync("diagnosisRecords") || [];
-    if (!Array.isArray(list)) list = [];
-    list.unshift(historyItem);
-    if (list.length > 50) list = list.slice(0, 50);
-    wx.setStorageSync("diagnosisRecords", list);
-  },
-
-  // ================= 页面交互 =================
-
-  goHome() {
-    wx.reLaunch({ url: '/pages/index/index' });
-  },
-
-  retest() {
-    // 返回两层：结果页 -> 问卷页 -> 选部位页/首页
-    wx.navigateBack({ delta: 1 }); // V5是 replace 跳转，所以退一层即可，或者直接 reLaunch
-  },
-
-  goHistory() {
-    wx.navigateTo({ url: '/pages/diagnosis/history/history' });
-  },
-
-  contactDoctor() {
-    wx.showModal({
-      title: '联系专家',
-      content: '是否复制植保专家微信号？',
-      success: (res) => {
-        if (res.confirm) {
-          wx.setClipboardData({ data: "PlantDoctor001" });
-        }
-      }
+  showError: function (msg) {
+    this.setData({ isLoading: false });
+    wx.showToast({
+      title: msg || '未知错误',
+      icon: 'none',
+      duration: 2000
     });
+  },
+
+  /**
+   * 用户点击右上角分享
+   */
+  onShareAppMessage: function () {
+    const disease = this.data.result.diseaseName || '作物健康诊断';
+    return {
+      title: `我的果园诊断报告：${disease}`,
+      path: `/pages/diagnosis/result/result?id=${this.data.resultId}`
+    };
   }
 });

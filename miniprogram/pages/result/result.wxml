@@ -1,136 +1,71 @@
-<view class="result-page">
-
-<!-- 标题 -->
-<view class="header">
-  <text class="title">诊断结果</text>
-</view>
-
-<!-- 总结 -->
-<view class="section">
-  <view class="section-title">总结</view>
-  <view class="section-content">
-    <text>{{summary}}</text>
-  </view>
-</view>
-
-<!-- 建议 -->
-<view class="section" wx:if="{{suggestions && suggestions.length > 0}}">
-  <view class="section-title">建议</view>
-  <view class="section-content">
-    <block wx:for="{{suggestions}}" wx:key="index">
-      <view class="suggestion-item">
-        <text>{{item}}</text>
+<view class="page-v4" wx:if="{{resultType === 'decision_tree_v5'}}">
+  
+  <view class="result-card {{report.severity}}">
+    <view class="card-header">
+      <view class="risk-tag">
+        <text class="risk-icon">⚠️</text>
+        <text>{{report.severityLabel}}</text>
       </view>
-    </block>
-  </view>
-</view>
+      <text class="date">{{report.time}}</text>
+    </view>
+    
+    <view class="diagnosis-name">{{report.title}}</view>
+    
+    <view class="tags-row">
+      <text wx:for="{{report.tags}}" wx:key="*this" class="tag">{{item}}</text>
+    </view>
 
-<!-- 单模块模式：直接显示 finalCode 对应的详情（如果有） -->
-<view wx:if="{{!isCombined}}">
-  <view class="section" wx:if="{{details && details.length > 0}}">
-    <view class="section-title">详细分析</view>
-    <view class="section-content">
-      <block wx:for="{{details}}" wx:key="index">
-        <view class="detail-item">
-          <text>{{item}}</text>
+    <view class="risk-bar-container">
+      <view class="risk-bar-label">风险指数</view>
+      <view class="risk-track">
+        <view class="risk-fill" 
+              style="width: {{report.severity === 'severe' ? '90%' : (report.severity === 'moderate' ? '60%' : '30%')}}">
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-box">
+    <view class="section-title">
+      <text class="icon">🔍</text> 专家辨证
+    </view>
+    <view class="logic-content">
+      <text user-select="true">{{report.logic}}</text>
+    </view>
+  </view>
+
+  <view class="section-box">
+    <view class="section-title">
+      <text class="icon">💊</text> 调理方案
+    </view>
+    <view class="solution-list">
+      <block wx:for="{{report.solutions}}" wx:key="index">
+        <view class="solution-item">
+          <view class="sol-type {{item.type === '系统固本' ? 'root-type' : 'cure-type'}}">
+            {{item.type || '建议'}}
+          </view>
+          <view class="sol-text" user-select="true">{{item.content}}</view>
         </view>
       </block>
-    </view>
-  </view>
-</view>
-
-<!-- 组合模式：分模块展示 -->
-<view wx:if="{{isCombined}}">
-
-  <!-- 叶片模块 -->
-  <view class="section" wx:if="{{leaf}}">
-    <view class="section-title">叶片诊断</view>
-    <view class="section-content">
-      <text>{{leaf.summary}}</text>
-
-      <block wx:if="{{leaf.details && leaf.details.length > 0}}">
-        <view class="sub-title">详细分析</view>
-        <block wx:for="{{leaf.details}}" wx:key="index">
-          <view class="detail-item">
-            <text>{{item}}</text>
-          </view>
-        </block>
-      </block>
-
-      <block wx:if="{{leaf.suggestions && leaf.suggestions.length > 0}}">
-        <view class="sub-title">建议</view>
-        <block wx:for="{{leaf.suggestions}}" wx:key="index">
-          <view class="suggestion-item">
-            <text>{{item}}</text>
-          </view>
-        </block>
-      </block>
+      <view wx:if="{{report.solutions.length === 0}}" class="empty-tip">
+        <text>暂无特定药物建议，请参考系统调理方案。</text>
+      </view>
     </view>
   </view>
 
-  <!-- 果实模块 -->
-  <view class="section" wx:if="{{fruit}}">
-    <view class="section-title">果实诊断</view>
-    <view class="section-content">
-      <text>{{fruit.summary}}</text>
-
-      <block wx:if="{{fruit.details && fruit.details.length > 0}}">
-        <view class="sub-title">详细分析</view>
-        <block wx:for="{{fruit.details}}" wx:key="index">
-          <view class="detail-item">
-            <text>{{item}}</text>
-          </view>
-        </block>
-      </block>
-
-      <block wx:if="{{fruit.suggestions && fruit.suggestions.length > 0}}">
-        <view class="sub-title">建议</view>
-        <block wx:for="{{fruit.suggestions}}" wx:key="index">
-          <view class="suggestion-item">
-            <text>{{item}}</text>
-          </view>
-        </block>
-      </block>
-    </view>
+  <view class="footer-btn-group">
+    <button class="btn-secondary" bindtap="goHome">返回首页</button>
+    <button class="btn-primary" bindtap="retest">重新诊断</button>
   </view>
-
-  <!-- 根系模块 -->
-  <view class="section" wx:if="{{root}}">
-    <view class="section-title">根系诊断</view>
-
-    <view wx:if="{{rootSkipped}}" class="section-content">
-      <text>根系整体健康，因此自动跳过根系详细诊断。</text>
-    </view>
-
-    <view class="section-content" wx:elif="{{!rootSkipped}}">
-      <text>{{root.summary}}</text>
-
-      <block wx:if="{{root.details && root.details.length > 0}}">
-        <view class="sub-title">详细分析</view>
-        <block wx:for="{{root.details}}" wx:key="index">
-          <view class="detail-item">
-            <text>{{item}}</text>
-          </view>
-        </block>
-      </block>
-
-      <block wx:if="{{root.suggestions && root.suggestions.length > 0}}">
-        <view class="sub-title">建议</view>
-        <block wx:for="{{root.suggestions}}" wx:key="index">
-          <view class="suggestion-item">
-            <text>{{item}}</text>
-          </view>
-        </block>
-      </block>
-    </view>
-  </view>
+  <button class="btn-text" bindtap="contactDoctor">联系植保专家</button>
 
 </view>
 
-<!-- 底部按钮 -->
-<view class="bottom-buttons">
-  <button class="btn-primary" bindtap="retest">重新测试</button>
-  <button class="btn-secondary" bindtap="goHome">返回首页</button>
-</view>
-
+<view wx:else>
+  <view class="page">
+    <view class="summary-card">
+      <text>旧版数据格式，建议重新测试。</text>
+    </view>
+    <button class="btn-primary" bindtap="retest" style="margin-top:40rpx;">重新测试</button>
+  </view>
 </view>

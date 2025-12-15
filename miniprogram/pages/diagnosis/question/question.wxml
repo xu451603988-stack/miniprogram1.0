@@ -1,56 +1,43 @@
-<view class="container">
-  
-  <view class="progress-box">
-    <view class="progress-bar">
-      <view class="progress-inner" style="width: {{progress}}%"></view>
-    </view>
-    <text class="progress-text">{{currentQuestion + 1}}/{{totalQuestions}}</text>
+<view class="page-container" wx:if="{{isInitialized}}">
+
+<view class="nav-header">
+  <view class="back-btn" bindtap="goBack">
+    <text class="back-icon">‹</text> 
+    <text>上一步</text>
+  </view>
+  <view class="step-indicator">智能诊断中...</view>
+</view>
+
+<view class="question-card fade-in">
+  <view class="question-title-box">
+    <view class="q-icon">❓</view>
+    <text class="question-title">{{currentNode.title}}</text>
   </view>
 
-  <view class="question-card" wx:if="{{questions.length > 0}}">
-    <view class="card-header">
-      <view class="q-tag">{{questions[currentQuestion].type === 'multiple' ? '多选' : '单选'}}</view>
-      <text class="q-title">{{questions[currentQuestion].title}}</text>
-    </view>
-
-    <view class="options-list">
-      
-      <radio-group wx:if="{{questions[currentQuestion].type === 'single'}}" 
-                   bindchange="onOptionSelect" 
-                   data-qid="{{questions[currentQuestion].id}}">
-        <label class="option-item {{currentAnswer === option.value ? 'selected' : ''}}" 
-               wx:for="{{questions[currentQuestion].options}}" 
-               wx:key="value" 
-               wx:for-item="option">
-          <view class="opt-row">
-            <text class="opt-label">{{option.label}}</text>
-            <radio value="{{option.value}}" checked="{{currentAnswer === option.value}}" color="#2d8c2d"/>
-          </view>
-        </label>
-      </radio-group>
-
-      <checkbox-group wx:if="{{questions[currentQuestion].type === 'multiple'}}" 
-                      bindchange="onOptionToggle" 
-                      data-qid="{{questions[currentQuestion].id}}">
-        <label class="option-item {{option.checked ? 'selected' : ''}}" 
-               wx:for="{{questions[currentQuestion].options}}" 
-               wx:key="value" 
-               wx:for-item="option">
-          <view class="opt-row">
-            <text class="opt-label">{{option.label}}</text>
-            <checkbox value="{{option.value}}" checked="{{option.checked}}" color="#2d8c2d"/>
-          </view>
-        </label>
-      </checkbox-group>
-
-    </view>
+  <view class="options-list">
+    <block wx:for="{{currentNode.options}}" wx:key="value">
+      <view 
+        class="option-item" 
+        hover-class="option-hover"
+        bindtap="onOptionClick"
+        data-item="{{item}}"
+      >
+        <view class="option-dot"></view>
+        
+        <text class="option-label">{{item.label}}</text>
+        
+        <text class="option-arrow">›</text>
+      </view>
+    </block>
   </view>
+</view>
 
-  <view class="footer">
-    <button class="btn prev" bindtap="goBack" wx:if="{{currentQuestion > 0 || currentStageIndex > 0}}">上一题</button>
-    <button class="btn next {{canGoNext ? '' : 'disabled'}}" bindtap="nextQuestion">
-      {{currentQuestion === totalQuestions - 1 && currentStageIndex === stages.length - 1 ? '提交诊断' : '下一题'}}
-    </button>
-  </view>
+<view class="footer-hint">
+  <text>基于《中药农业》系统辨证逻辑实时分析</text>
+</view>
 
+</view>
+
+<view wx:else class="loading-box">
+<text class="loading-text">正在加载诊断逻辑...</text>
 </view>

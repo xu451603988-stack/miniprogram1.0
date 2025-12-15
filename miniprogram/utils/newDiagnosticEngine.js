@@ -1,120 +1,71 @@
 // miniprogram/utils/newDiagnosticEngine.js
 /**
- * 柑橘健康诊断 · 双引擎融合版 V2.2 (修复版)
- * 包含：微观权重配置、物候修正、TCM宏观常量完整定义
+ * 作物健康诊断 · 时空记忆引擎 V4.0
+ * 核心升级：
+ * 1. 历史追溯 (Memory): 基于历史记录修正当前概率（惯性原则）
+ * 2. 未来预警 (Prognosis): 基于当前诊断 + 下月物候预测次生灾害
  */
 
 const leafConfig = require('./newAlgorithm/leafConfig.js');
 const fruitConfig = require('./newAlgorithm/fruitConfig.js');
 const rootConfig = require('./newAlgorithm/rootConfig.js');
 
-// ---------------------- 1. 辅助工具函数 ----------------------
+// ---------------------- 1. 基础工具 ----------------------
 
-function deepClone(obj) {
-  return JSON.parse(JSON.stringify(obj || {}));
+function deepClone(obj) { return JSON.parse(JSON.stringify(obj || {})); }
+
+function calculateConfidence(score) {
+  if (score <= 0) return 0;
+  const k = 0.25, x0 = 5;
+  const probability = 100 / (1 + Math.exp(-k * (score - x0)));
+  return Math.min(Math.round(probability), 99);
 }
 
-function rankScores(map) {
-  const list = Object.keys(map || {}).map(key => ({
-    code: key,
-    score: map[key]
-  }));
-  list.sort((a, b) => b.score - a.score);
-  return list;
-}
-
-function determineSeverity(maxScore) {
-  if (maxScore >= 12) return "severe";
-  if (maxScore >= 6) return "moderate";
-  if (maxScore >= 3) return "mild";
-  return "none";
-}
-
-function mergeSubsystemScores(list) {
-  const merged = { soil: 0, crop: 0, microbe: 0, environment: 0, management: 0 };
-  (list || []).forEach(item => {
-    if (!item) return;
-    Object.keys(merged).forEach(k => {
-      if (item[k] != null) merged[k] += item[k];
-    });
-  });
-  return merged;
-}
-
-function normalizeSubsystemScores(scores) {
-  const norm = deepClone(scores || {});
-  let max = 0;
-  Object.keys(norm).forEach(k => {
-    if (norm[k] > max) max = norm[k];
-  });
-  if (max <= 0) {
-    Object.keys(norm).forEach(k => (norm[k] = 0));
-  } else {
-    Object.keys(norm).forEach(k => {
-      norm[k] = Math.round((norm[k] / max) * 100);
-    });
-  }
-  return norm;
-}
-
-// ---------------------- 2. 微观算法核心逻辑 ----------------------
-
-// 获取物候期Key
 function getPhenologyKey(month) {
   const m = parseInt(month || 0);
   if (m === 12 || m === 1) return "overwinter";
-  if (m === 2) return "budding";
-  if (m === 3) return "budding_flowering";
-  if (m === 4) return "flowering_fruit_drop";
-  if (m === 5) return "fruit_drop_summer_rain";
-  if (m === 6) return "summer_rain";
-  if (m === 7) return "flower_induction";
-  if (m === 8 || m === 9) return "autumn_flush";
-  if (m === 10 || m === 11) return "fruit_expansion";
+  if (m >= 2 && m <= 3) return "budding";
+  if (m >= 4 && m <= 5) return "flowering_fruit_drop";
+  if (m >= 6 && m <= 8) return "summer_rain";
+  if (m >= 9 && m <= 11) return "fruit_expansion";
   return "overwinter";
 }
 
-// 代码转中文名称映射
 function mapCodeToName(code) {
   const map = {
-    // === 根系特有 ===
-    "nematodes": "根结线虫",
-    "root_rot_fungal": "根腐病 (真菌性)",
-    "root_hypoxia": "根系缺氧 (沤根)",
-    "fertilizer_burn": "烧根 (肥害)",
-    "soil_compaction": "土壤板结",
-    "salt_stress": "土壤盐渍化",
-    "herbicide_damage": "除草剂药害",
-    "weak_vigor": "根系活力弱",
-    "drought_stress": "干旱胁迫",
-    
-    // === 通用 ===
-    "N": "缺氮", "P": "缺磷", "K": "缺钾", "Fe": "缺铁", "Zn": "缺锌", "Mg": "缺镁", "B": "缺硼", "Mn": "缺锰", "S": "缺硫",
-    "fungal": "真菌性病害", "bacterial": "细菌性病害", "viral": "病毒病", "fruit_fly": "果蝇", 
-    "red_spider": "红蜘蛛", "leaf_miner": "潜叶蛾", "thrips": "蓟马", "aphid": "蚜虫", "scale_insect": "介壳虫", "psyllid": "木虱",
-    "sunburn": "日灼伤", "cracking": "裂果", "anthracnose": "炭疽病", "greasy_spot": "脂点黄斑病", "canker": "溃疡病", "melanose": "砂皮病", "brown_rot": "疫菌褐腐病", "sooty_mold": "煤污病", "hlb": "黄龙病(疑似)"
+    "nematodes": "根结线虫", "root_rot_fungal": "真菌性根腐", "root_hypoxia": "根系缺氧",
+    "fertilizer_burn": "肥害烧根", "soil_compaction": "土壤板结", "N": "缺氮", "Mg": "缺镁", 
+    "Fe": "缺铁", "Zn": "缺锌", "fruit_fly": "果实蝇", "red_spider": "红蜘蛛", 
+    "canker": "溃疡病", "anthracnose": "炭疽病", "hlb": "黄龙病", "sunburn": "日灼病",
+    "deficiency_Fe_Zn": "缺铁/缺锌", "deficiency_Mg": "缺镁"
   };
   return map[code] || code;
 }
 
-// 计算微观得分
+// ---------------------- 2. 微观计算 ----------------------
+
 function calculateMicroCauses(answers, config, phenologyKey) {
   if (!config || !config.features) return [];
   const scores = {}; 
-  
-  Object.keys(answers).forEach(questionId => {
-    let userVal = answers[questionId];
-    if (!userVal) return;
-    const selectedOptions = Array.isArray(userVal) ? userVal : [userVal];
+  const evidenceChain = {}; 
 
-    selectedOptions.forEach(option => {
-      let featureKey = option; 
-      const featureWeight = config.features[featureKey];
-      if (featureWeight) {
+  Object.keys(answers).forEach(qid => {
+    let vals = answers[qid];
+    if (!vals) return;
+    if (!Array.isArray(vals)) vals = [vals];
+
+    vals.forEach(opt => {
+      const feat = config.features[opt];
+      if (feat) {
         ['nutrition', 'pathogen', 'physio'].forEach(type => {
-          if (featureWeight[type]) {
-            Object.keys(featureWeight[type]).forEach(k => {
-              scores[k] = (scores[k] || 0) + featureWeight[type][k];
+          if (feat[type]) {
+            Object.keys(feat[type]).forEach(code => {
+              const w = feat[type][code];
+              scores[code] = (scores[code] || 0) + w;
+              if (w > 0) {
+                if (!evidenceChain[code]) evidenceChain[code] = [];
+                evidenceChain[code].push(opt); 
+              }
             });
           }
         });
@@ -123,306 +74,198 @@ function calculateMicroCauses(answers, config, phenologyKey) {
   });
 
   if (phenologyKey && config.phenologyCorrections && config.phenologyCorrections[phenologyKey]) {
-    const correction = config.phenologyCorrections[phenologyKey];
-    Object.keys(scores).forEach(causeKey => {
-      if (correction[causeKey] != null) scores[causeKey] *= correction[causeKey];
-    });
+    const cor = config.phenologyCorrections[phenologyKey];
+    Object.keys(scores).forEach(c => { if (cor[c] != null) scores[c] *= cor[c]; });
   }
 
-  const sorted = Object.keys(scores)
-    .map(key => ({ code: key, score: scores[key] }))
-    .filter(item => item.score > 2)
-    .sort((a, b) => b.score - a.score);
-
-  return sorted.slice(0, 3);
-}
-
-// ---------------------- 3. TCM 宏观常量定义 (此前缺失的部分) ----------------------
-
-const SYNDROME_META = {
-  water_nutrient_imbalance: {
-    name: "水肥失衡（水湿/干旱/盐害）",
-    principles: ["调水", "稳肥", "减小波动"]
-  },
-  root_aeration_stagnation: {
-    name: "根区运行不畅（缺氧/板结）",
-    principles: ["疏水排湿", "增加通气", "活化根系"]
-  },
-  vigor_deficiency: {
-    name: "作物体质偏虚（树势弱）",
-    principles: ["扶正培本", "补养根叶", "减轻负载"]
-  },
-  microbe_imbalance: {
-    name: "微生态失衡（有害菌压力大）",
-    principles: ["抑邪扶正", "改善根际环境"]
-  },
-  disease_pressure: {
-    name: "病虫压力偏高（易感体系）",
-    principles: ["精准控害", "打早打小", "降低基数"]
-  },
-  management_fluctuation: {
-    name: "管理节奏波动大",
-    principles: ["平稳管理", "避免一次性强刺激"]
-  }
-};
-
-const EMPTY_SUBSYSTEM = {
-  soil: 0,
-  crop: 0,
-  microbe: 0,
-  environment: 0,
-  management: 0
-};
-
-// ---------------------- 4. TCM 规则表定义 ----------------------
-
-function makeRule(field, option, syndromes, subsystems) {
-  return {
-    field,
-    option,
-    syndromes: syndromes || {},
-    subsystems: subsystems || {}
-  };
-}
-
-const LEAF_TCM_RULES = [
-  makeRule("symptoms", "interveinal_chlorosis", { vigor_deficiency: 1, water_nutrient_imbalance: 1 }, { crop: 2, soil: 1 }),
-  makeRule("symptoms", "vein_chlorosis", { water_nutrient_imbalance: 1 }, { soil: 1, crop: 1 }),
-  makeRule("symptoms", "inverted_v_yellow", { vigor_deficiency: 2 }, { crop: 2, soil: 1 }), 
-  makeRule("symptoms", "uniform_yellow", { vigor_deficiency: 2, water_nutrient_imbalance: 1 }, { crop: 2, soil: 1 }), 
-  makeRule("symptoms", "local_spots_lesions", { disease_pressure: 2, microbe_imbalance: 1 }, { microbe: 2, environment: 1 }),
-  makeRule("symptoms", "red_spider_symptoms", { disease_pressure: 3 }, { environment: 2, crop: 1 }), 
-  makeRule("symptoms", "leaf_miner_trails", { disease_pressure: 3 }, { environment: 1, crop: 2 }), 
-  makeRule("symptoms", "sooty_mold", { disease_pressure: 2 }, { environment: 1 }), 
-  makeRule("symptoms", "tip_burn", { water_nutrient_imbalance: 2 }, { soil: 1, management: 1 }),
-  makeRule("leaf_age", "leaf_age_mix", { vigor_deficiency: 3 }, { crop: 3 }), 
-  makeRule("recent_events", "ev_rain", { root_aeration_stagnation: 1, microbe_imbalance: 1 }, { soil: 1, microbe: 1 }),
-  makeRule("recent_events", "ev_heavy_n", { water_nutrient_imbalance: 1, management_fluctuation: 1 }, { soil: 1, management: 1 })
-];
-
-const FRUIT_TCM_RULES = [
-  makeRule("fruit_position", "position_outer", { disease_pressure: 1 }, { environment: 2 }),
-  makeRule("fruit_symptoms", "canker_spots", { disease_pressure: 3, microbe_imbalance: 1 }, { microbe: 2, management: 1 }), 
-  makeRule("fruit_symptoms", "melanose_spots", { disease_pressure: 2, microbe_imbalance: 2 }, { microbe: 2, environment: 1 }), 
-  makeRule("fruit_symptoms", "thrips_ring", { disease_pressure: 3 }, { crop: 1, environment: 1 }), 
-  makeRule("fruit_symptoms", "sunburn_patch", { water_nutrient_imbalance: 1 }, { environment: 3 }), 
-  makeRule("fruit_symptoms", "cracking", { water_nutrient_imbalance: 3 }, { soil: 2, management: 1 }),
-  makeRule("fruit_symptoms", "maggot_rot", { disease_pressure: 4 }, { environment: 1, management: 2 }), 
-  makeRule("drop_status", "drop_severe", { vigor_deficiency: 2, water_nutrient_imbalance: 1 }, { crop: 2, soil: 1 }) 
-];
-
-const ROOT_TCM_RULES = [
-  makeRule("soil_texture", "soil_clay_hard", { root_aeration_stagnation: 3 }, { soil: 3 }), 
-  makeRule("soil_texture", "soil_salty", { water_nutrient_imbalance: 3 }, { soil: 2 }), 
-  makeRule("soil_moisture", "waterlogged", { root_aeration_stagnation: 3, microbe_imbalance: 2 }, { soil: 3, microbe: 1 }), 
-  makeRule("soil_moisture", "dry_crack", { water_nutrient_imbalance: 2 }, { soil: 2 }), 
-  makeRule("root_symptoms", "root_rot_smell", { root_aeration_stagnation: 3, microbe_imbalance: 3 }, { soil: 2, microbe: 2 }), 
-  makeRule("root_symptoms", "root_knots", { disease_pressure: 3, vigor_deficiency: 1 }, { soil: 2, microbe: 2, crop: 1 }), 
-  makeRule("root_symptoms", "root_burn_dry", { water_nutrient_imbalance: 3, management_fluctuation: 2 }, { soil: 2, management: 2 }), 
-  makeRule("recent_events", "ev_heavy_fertilizer", { water_nutrient_imbalance: 2, management_fluctuation: 1 }, { soil: 1, management: 1 })
-];
-
-// ---------------------- 5. 执行逻辑 ----------------------
-
-function accumulateTCM(rules, answers) {
-  const syndromeScores = {};
-  const subsystemScores = deepClone(EMPTY_SUBSYSTEM);
-  let hitCount = 0;
-
-  (rules || []).forEach(rule => {
-    const val = answers[rule.field];
-    if (val == null) return;
-
-    let matched = false;
-    if (Array.isArray(val)) {
-      matched = val.includes(rule.option);
-    } else {
-      matched = val === rule.option;
-    }
-    if (!matched) return;
-
-    hitCount += 1;
-
-    Object.keys(rule.syndromes || {}).forEach(code => {
-      syndromeScores[code] = (syndromeScores[code] || 0) + rule.syndromes[code];
-    });
-
-    Object.keys(rule.subsystems || {}).forEach(code => {
-      subsystemScores[code] = (subsystemScores[code] || 0) + rule.subsystems[code];
-    });
+  return Object.keys(scores).map(code => {
+    const score = scores[code];
+    const isIronclad = (config.features && Object.values(config.features).some(f => 
+      ['nutrition','pathogen','physio'].some(t => f[t] && f[t][code] >= 15)
+    ));
+    
+    return {
+      code,
+      name: mapCodeToName(code),
+      score,
+      confidence: isIronclad && score > 10 ? 99 : calculateConfidence(score),
+      evidences: evidenceChain[code] || []
+    };
   });
-
-  return { syndromeScores, subsystemScores, hitCount };
 }
 
-function buildModuleResult(module, answers, context) {
-  let rules = [];
-  if (module === "leaf") rules = LEAF_TCM_RULES;
-  else if (module === "fruit") rules = FRUIT_TCM_RULES;
-  else if (module === "root") rules = ROOT_TCM_RULES;
+// ---------------------- 3. 协同推理 (V3.5) ----------------------
 
-  const { syndromeScores, subsystemScores, hitCount } = accumulateTCM(rules, answers || {});
-  const ranked = rankScores(syndromeScores);
-  const primary = ranked.length ? ranked[0] : null;
-  const severity = determineSeverity(primary ? primary.score : 0);
-  const normalizedSubsystem = normalizeSubsystemScores(subsystemScores);
+function applySynergyRules(mergedMap, rootRisks) {
+  const topRoot = rootRisks.sort((a,b) => b.score - a.score)[0];
+  const isRootBad = topRoot && topRoot.confidence > 50;
+  
+  // 规则: 根腐致缺素
+  if (isRootBad && ["root_rot_fungal", "nematodes", "root_hypoxia"].includes(topRoot.code)) {
+    ["N", "Fe", "Zn", "Mg", "B", "Mn", "deficiency_Fe_Zn", "deficiency_Mg"].forEach(nutri => {
+      if (mergedMap[nutri]) {
+        mergedMap[nutri].confidence *= 0.6; // 降低缺素置信度
+        mergedMap[topRoot.code].confidence = Math.min(99, mergedMap[topRoot.code].confidence + 15); // 提高根病置信度
+        mergedMap[topRoot.code].synergyLog = `根部[${topRoot.name}]导致养分吸收受阻，引发地上部缺素假象。`;
+      }
+    });
+  }
+}
 
-  const suggestions = [];
-  if (primary && SYNDROME_META[primary.code]) {
-    suggestions.push(
-      "诊断主证：" + SYNDROME_META[primary.code].name,
-      "调理原则：" + SYNDROME_META[primary.code].principles.join("、")
-    );
-  } else {
-    suggestions.push("当前未形成集中主证，可结合现场情况综合判断。");
+// ---------------------- 4. 【核心升级】时空记忆逻辑 (V4.0) ----------------------
+
+/**
+ * 历史追溯：根据上一条诊断记录修正当前概率
+ */
+function applyHistoryBias(mergedMap, lastRecord) {
+  if (!lastRecord || !lastRecord.diagnosis) return null;
+
+  // 计算时间差 (天)
+  const now = new Date().getTime();
+  const lastTime = lastRecord.timestamp || now;
+  const daysDiff = Math.floor((now - lastTime) / (1000 * 60 * 60 * 24));
+
+  // 只追溯 30 天内的记录
+  if (daysDiff > 30) return null;
+
+  const lastCode = lastRecord.diagnosis;
+  const log = [];
+
+  // 1. 同病相怜 (Recurrence): 如果这次也怀疑是同一个病，概率大增
+  if (mergedMap[lastCode]) {
+    // 衰减系数：时间越近，影响越大
+    const boost = Math.max(0, 20 - daysDiff); 
+    mergedMap[lastCode].confidence = Math.min(99, mergedMap[lastCode].confidence + boost);
+    mergedMap[lastCode].score += 5;
+    log.push(`检测到 ${daysDiff} 天前曾确诊【${mapCodeToName(lastCode)}】，判定为病情持续或复发。`);
   }
 
-  return {
-    module,
-    severity,
-    hitCount,
-    primarySyndrome: primary,
-    syndromes: ranked,
-    subsystemRaw: subsystemScores,
-    subsystem: normalizedSubsystem,
-    suggestions,
-    mainCause: primary ? primary.code : null
-  };
+  // 2. 关联演变 (Progression): 比如 上次是红蜘蛛 -> 这次叶片发白
+  if (lastCode === 'red_spider' && mergedMap['deficiency_Fe_Zn']) {
+    mergedMap['deficiency_Fe_Zn'].confidence *= 0.8; // 排除缺素
+    // 如果列表里有红蜘蛛，提升它
+    if (mergedMap['red_spider']) {
+        mergedMap['red_spider'].confidence += 15;
+        log.push(`基于历史红蜘蛛病史，当前叶片症状极可能为虫害后遗症。`);
+    }
+  }
+
+  return log.length > 0 ? log.join(";") : null;
 }
 
-// ---------------------- 6. 导出引擎接口 ----------------------
+/**
+ * 未来预警：生成 Prognosis
+ */
+function predictFuture(topRisk, month) {
+  if (!topRisk) return null;
+  const m = parseInt(month || 1);
+  const code = topRisk.code;
+  const predictions = [];
+
+  // 规则 1: 传染性病害在雨季的预警
+  if (["canker", "anthracnose", "root_rot_fungal"].includes(code)) {
+    if (m >= 4 && m <= 8) {
+      predictions.push("下月进入高温雨季，此病害极易随雨水爆发式扩散，务必在雨前喷施铜制剂封锁。");
+    }
+  }
+
+  // 规则 2: 虫害迭代
+  if (code === "red_spider") {
+    predictions.push("红蜘蛛繁殖极快，建议 7 天后复查一次，防止卵块孵化造成二次爆发。");
+  }
+
+  // 规则 3: 根系影响果实
+  if (code === "root_rot_fungal" || code === "nematodes") {
+    if (m >= 9 && m <= 11) {
+      predictions.push("根系受损将严重影响秋梢转绿和果实膨大，警惕后期出现大量‘太阳果’或落果。");
+    }
+  }
+
+  return predictions.length > 0 ? predictions : null;
+}
+
+/**
+ * 动态生成诊断逻辑文本 (升级版)
+ */
+function generateDynamicLogic(topRisk, rootRisks, historyLog, futureLog) {
+  if (!topRisk) return "未检测到明显异常，建议加强日常管理。";
+
+  const diseaseName = topRisk.name;
+  
+  let text = `经 V4.0 引擎综合分析，主病判定为【${diseaseName}】（置信度 ${topRisk.confidence}%）。`;
+  
+  // 1. 协同分析
+  if (topRisk.synergyLog) {
+    text += `\n\n🔍 根叶关联：${topRisk.synergyLog}`;
+  } 
+  
+  // 2. 历史追溯 (V4.0 新增)
+  if (historyLog) {
+    text += `\n\n📜 病史追踪：${historyLog}`;
+  }
+
+  // 3. 未来预警 (V4.0 新增)
+  if (futureLog && futureLog.length > 0) {
+    text += `\n\n🔮 风险预警：${futureLog.join('')}`;
+  }
+
+  return text;
+}
+
+// ---------------------- 5. 引擎入口 ----------------------
 
 const DiagnosticEngine = {
-  run(options) {
-    const module = options && options.module;
-    const answers = (options && options.answers) || {};
-    if (!module) {
-      throw new Error("newDiagnosticEngine.run: module 不能为空");
-    }
-    return buildModuleResult(module, answers, options || {});
-  },
-
   runCombined(options) {
-    const positions = (options && options.positions) || [];
-    const allAnswers = (options && options.answers) || {};
-    const month = options && options.month;
-    const crop = options && options.crop;
-
+    const { positions, answers, month, lastRecord } = options; // 接收 lastRecord
     const phenologyKey = getPhenologyKey(month);
 
-    const leafTCM = positions.includes("leaf")
-      ? buildModuleResult("leaf", allAnswers.leaf || {}, { month, crop })
-      : null;
-    const fruitTCM = positions.includes("fruit")
-      ? buildModuleResult("fruit", allAnswers.fruit || {}, { month, crop })
-      : null;
-    const rootTCM = buildModuleResult("root", allAnswers.root || {}, { month, crop });
+    // 1. 微观计算
+    let leafRisks = [], fruitRisks = [], rootRisks = [];
+    if (positions.includes("leaf")) leafRisks = calculateMicroCauses(answers.leaf, leafConfig, phenologyKey);
+    if (positions.includes("fruit")) fruitRisks = calculateMicroCauses(answers.fruit, fruitConfig, phenologyKey);
+    rootRisks = calculateMicroCauses(answers.root, rootConfig, phenologyKey);
 
-    let leafMicro = [], fruitMicro = [], rootMicro = [];
-
-    if (leafTCM) {
-      leafMicro = calculateMicroCauses(allAnswers.leaf, leafConfig, phenologyKey);
-      if (leafMicro.length > 0) {
-        leafTCM.suggestions.unshift(`🔍 详细排查提示：疑似 **${mapCodeToName(leafMicro[0].code)}** (置信度 ${leafMicro[0].score.toFixed(1)})`);
+    // 2. 合并初步结果
+    const mergedMap = {};
+    [...leafRisks, ...fruitRisks, ...rootRisks].forEach(item => {
+      if (!mergedMap[item.code]) {
+        mergedMap[item.code] = { ...item };
+      } else {
+        mergedMap[item.code].score += item.score;
+        mergedMap[item.code].confidence = calculateConfidence(mergedMap[item.code].score);
+        mergedMap[item.code].evidences = [...mergedMap[item.code].evidences, ...item.evidences];
       }
-    }
-
-    if (fruitTCM) {
-      fruitMicro = calculateMicroCauses(allAnswers.fruit, fruitConfig, phenologyKey);
-      if (fruitMicro.length > 0) {
-        fruitTCM.suggestions.unshift(`🔍 详细排查提示：果面特征指向 **${mapCodeToName(fruitMicro[0].code)}**`);
-      }
-    }
-
-    if (rootTCM) {
-      rootMicro = calculateMicroCauses(allAnswers.root, rootConfig, phenologyKey);
-      if (rootMicro.length > 0) {
-        rootTCM.suggestions.unshift(`🔍 详细排查提示：根部迹象高度疑似 **${mapCodeToName(rootMicro[0].code)}**`);
-      }
-    }
-
-    const candidates = [leafTCM, fruitTCM, rootTCM].filter(Boolean);
-    let mainModule = null;
-    if (candidates.length) {
-      candidates.sort((a, b) => {
-        const aw = a.primarySyndrome ? a.primarySyndrome.score : 0;
-        const bw = b.primarySyndrome ? b.primarySyndrome.score : 0;
-        return bw - aw;
-      });
-      mainModule = candidates[0].module;
-    }
-
-    const systemScoresRaw = mergeSubsystemScores([
-      leafTCM && leafTCM.subsystemRaw,
-      fruitTCM && fruitTCM.subsystemRaw,
-      rootTCM && rootTCM.subsystemRaw
-    ]);
-    const systemScores = normalizeSubsystemScores(systemScoresRaw);
-
-    const hasIssue = candidates.some(c => c.severity !== "none");
-
-    const mergedSyndromeScores = {};
-    candidates.forEach(c => {
-      (c.syndromes || []).forEach(s => {
-        mergedSyndromeScores[s.code] = (mergedSyndromeScores[s.code] || 0) + s.score;
-      });
     });
-    const mergedRanked = rankScores(mergedSyndromeScores).slice(0, 2);
+
+    // 3. 执行协同规则 (V3.5)
+    applySynergyRules(mergedMap, rootRisks);
+
+    // 4. 【执行历史追溯】 (V4.0)
+    const historyLog = applyHistoryBias(mergedMap, lastRecord);
+
+    // 5. 最终排序
+    const finalRanking = Object.values(mergedMap).sort((a, b) => b.confidence - a.confidence);
+    const topRisk = finalRanking.length > 0 ? finalRanking[0] : null;
+
+    // 6. 【生成未来预警】 (V4.0)
+    const futureLog = predictFuture(topRisk, month);
+
+    // 7. 生成动态报告
+    const dynamicLogic = generateDynamicLogic(topRisk, rootRisks, historyLog, futureLog);
 
     const summary = {
-      type: "tcm_enhanced",
-      hasIssue,
-      mainModule,
-      mainSyndromes: mergedRanked,
-      systemScores,
-      microRisks: [...leafMicro, ...fruitMicro, ...rootMicro].map(item => ({
-        name: mapCodeToName(item.code),
-        score: item.score
-      }))
+      type: "decision_tree_v5",
+      diagnosis: topRisk ? topRisk.code : "unknown",
+      confidence: topRisk ? topRisk.confidence : 0,
+      dynamicLogic: dynamicLogic, 
+      rootStatus: (rootRisks[0] && rootRisks[0].confidence > 50) ? rootRisks[0].code : "normal",
+      tags: topRisk ? [mapCodeToName(topRisk.code)] : [] // 简单回填
     };
 
-    return { leaf: leafTCM, fruit: fruitTCM, root: rootTCM, summary };
-  },
+    if (futureLog) summary.hasFutureWarning = true;
 
-  renderResult(result) {
-    if (typeof result === "string") return result;
-
-    if (result && result.summary && result.summary.type === "tcm") {
-      const s = result.summary;
-      const lines = [];
-
-      if (!s.hasIssue) {
-        lines.push("当前未发现明显系统性问题，可按常规管理观察。");
-      } else if (s.mainSyndromes && s.mainSyndromes.length) {
-        const first = s.mainSyndromes[0];
-        if (SYNDROME_META[first.code]) {
-          lines.push("综合判断：以【" + SYNDROME_META[first.code].name + "】为主。");
-          lines.push("建议优先围绕“" + SYNDROME_META[first.code].principles.join("、") + "”进行管理调整。");
-        }
-      }
-
-      if (s.microRisks && s.microRisks.length > 0) {
-        const riskNames = s.microRisks.slice(0, 2).map(r => r.name).join("、");
-        lines.push(`⚠️ 重点关注：${riskNames}`);
-      }
-
-      lines.push(
-        "系统风险概览（0-100）：",
-        "土壤 " + s.systemScores.soil +
-          " / 作物本体 " + s.systemScores.crop +
-          " / 微生态 " + s.systemScores.microbe +
-          " / 环境 " + s.systemScores.environment +
-          " / 管理 " + s.systemScores.management
-      );
-
-      return lines.join("\n");
-    }
-
-    if (result && result.primarySyndrome && SYNDROME_META[result.primarySyndrome.code]) {
-      return "诊断主证：" + SYNDROME_META[result.primarySyndrome.code].name;
-    }
-
-    return "暂无明显异常。";
+    console.log("📊 [V4.0 时空引擎] 结果:", summary);
+    return summary;
   }
 };
 
