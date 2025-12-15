@@ -1,0 +1,42 @@
+<view class="page">
+
+<view class="header">
+  <text class="header-title">选择作物</text>
+</view>
+
+<view class="crop-list">
+  <block wx:for="{{crops}}" wx:key="key">
+    <view
+      class="crop-card {{!item.enabled ? 'disabled' : ''}}"
+      bindtap="onSelectCrop"
+      data-key="{{item.key}}"
+    >
+      <view class="left">
+        <text class="icon">
+          <block wx:if="{{item.key === 'citrus'}}">🍊</block>
+          <block wx:elif="{{item.key === 'apple'}}">🍎</block>
+          <block wx:elif="{{item.key === 'grape'}}">🍇</block>
+          <block wx:elif="{{item.key === 'peach'}}">🍑</block>
+        </text>
+
+        <view class="text-group">
+          <text class="name">{{item.name}}</text>
+          <text class="desc">{{item.desc}}</text>
+        </view>
+      </view>
+
+      <view class="right">
+        <!-- 已启用显示箭头 -->
+        <text wx:if="{{item.enabled}}" class="arrow">›</text>
+
+        <!-- 未启用显示开发中标签 -->
+        <view wx:if="{{!item.enabled}}" class="badge">
+          <text class="badge-text">开发中</text>
+        </view>
+      </view>
+
+    </view>
+  </block>
+</view>
+
+</view>
