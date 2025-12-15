@@ -8,16 +8,15 @@
     "pages/diagnosis/history/history",
     "pages/diagnosis/expert/expert",
     "pages/user/user",
-    "pages/orchard/orchard"
+    "pages/orchard/orchard",
+    "pages/index/index"
   ],
   "window": {
-    "navigationBarBackgroundColor": "#FFFFFF",
-    "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "作物健康诊断系统",
-    "backgroundColor": "#F4F5F7",
-    "backgroundTextStyle": "dark"
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#166534",
+    "navigationBarTitleText": "作物健康诊断",
+    "navigationBarTextStyle": "white"
   },
-  "style": "v2",
   "sitemapLocation": "sitemap.json",
-  "lazyCodeLoading": "requiredComponents"
+  "style": "v2"
 }
