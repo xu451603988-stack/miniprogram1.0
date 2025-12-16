@@ -1,11 +1,23 @@
 // miniprogram/data/questionnaire/leaf_questions.js
-// 柑橘叶片问卷（升级版）
-// 优化点：区分了黄化细节、增加了红蜘蛛/潜叶蛾等特定描述
+// 柑橘叶片问卷（最终完善版）
+// 新增：树势背景调查，辅助判断内因
 
 module.exports = [
   {
+    id: "tree_vigor",
+    title: "【望诊】当前这棵树的整体长势如何？（重要）",
+    type: "single",
+    required: true,
+    options: [
+      { label: "树势衰弱（枝条稀疏、无新梢、叶片无光泽）", value: "TREE_WEAK" },
+      { label: "树势中庸（正常生长，但这几天有点不对劲）", value: "TREE_NORMAL" },
+      { label: "树势旺长（枝条徒长、叶片浓绿巨大）", value: "TREE_VIGOROUS" },
+      { label: "幼树 / 刚种下不久的小苗", value: "TREE_YOUNG" }
+    ]
+  },
+  {
     id: "leaf_age",
-    title: "【望诊】主要出问题的叶片是哪种？（必须）",
+    title: "【望诊】主要出问题的叶片是哪种？",
     type: "single",
     required: true,
     options: [
@@ -29,26 +41,25 @@ module.exports = [
       
       // --- 斑点/形态类 ---
       { label: "叶片上有不规则的褐色/黑色斑点", value: "local_spots_lesions" },
-      { label: "有灰白色/银灰色的虫道（像画地图一样）", value: "leaf_miner_trails" },
-      { label: "叶面布满灰尘状小白点/红点（失去光泽）", value: "red_spider_symptoms" },
+      { label: "有灰白色/银灰色的虫道（鬼画符）", value: "leaf_miner_trails" },
+      { label: "叶面布满灰尘状小白点/红点", value: "red_spider_symptoms" },
       { label: "叶片畸形、扭曲或明显皱缩", value: "leaf_curl" },
       { label: "叶面有黑色煤烟状粉末（煤污）", value: "sooty_mold" },
       
       // --- 坏死类 ---
       { label: "叶尖或叶缘焦枯（像火烧过）", value: "tip_burn" },
-      { label: "没有上述明显症状 / 不确定", value: "none_of_above" }
+      { label: "没有上述明显症状", value: "none_of_above" }
     ]
   },
   {
-    id: "distribution",
-    title: "【望诊】症状在树上的分布情况？",
+    id: "leaf_curl_direction",
+    title: "【望诊】如果是卷叶，是向哪边卷？",
     type: "single",
-    required: true,
+    required: false, // 只有选了卷叶才需要关心这个，设为非必填或通过逻辑控制
     options: [
-      { label: "零星发生，只有少数枝条有", value: "scattered" },
-      { label: "局部集中，像扇形一样某一块特别严重", value: "sectoral" },
-      { label: "全树普遍发生", value: "uniform" },
-      { label: "主要集中在树冠顶部", value: "top_heavy" }
+      { label: "向叶背卷曲（反卷/下卷）- 像扣过来的船", value: "curl_down" },
+      { label: "向叶面卷曲（正卷/上卷）- 像这种 U 形", value: "curl_up" },
+      { label: "没卷叶 / 不确定", value: "curl_none" }
     ]
   },
   {
