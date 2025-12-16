@@ -1,183 +1,223 @@
 // miniprogram/pages/diagnosis/question/question.js
-// V5.0 决策树驱动引擎 (V4.3 排除法逻辑增强版)
+// 决策树引擎核心 V6.0 (修复白屏问题 + 适配国际标准数据)
 
 const app = getApp();
 
+// 1. 【关键】引入您更新好的决策树数据文件
 const decisionTrees = {
   'citrus_leaf': require('../../../data/decision_trees/citrus_leaf.js'),
-  'citrus_fruit': require('../../../data/decision_trees/citrus_fruit.js') 
+  'citrus_fruit': require('../../../data/decision_trees/citrus_fruit.js')
 };
 
 Page({
   data: {
-    currentNode: null,
-    historyStack: [],
-    isInitialized: false,
+    isInitialized: false, // 控制加载状态
+    currentNode: null,    // 当前题目节点
+    historyStack: [],     // 历史路径栈 (用于返回上一题)
+    
+    // 上下文
     crop: 'citrus',
-    module: 'leaf'
+    module: 'leaf',       // 当前运行的模块 (leaf/fruit)
+    
+    // 答案收集
+    userChoices: {},      // 记录用户的每一步选择
+    tempDisease: null     // 过程中的疑似线索
   },
 
-  userChoices: {},
-  tempDisease: null, // 暂存过程中的疑似病害（如：缺镁）
-
   onLoad(options) {
-    const crop = options.crop || app.globalData.currentCrop || 'citrus';
-    let moduleType = 'leaf';
-    if (options.positions && options.positions.indexOf('fruit') > -1) {
-      moduleType = 'fruit';
+    // 1. 解析参数
+    const crop = options.crop || (app.globalData.currentCrop) || 'citrus';
+    
+    // 解析 positions (例如 ["leaf", "fruit"])
+    let positions = [];
+    if (options.positions) {
+      try { positions = JSON.parse(decodeURIComponent(options.positions)); } catch(e){}
     }
     
-    this.setData({ crop, module: moduleType });
+    // 2. 智能决定加载哪棵树
+    // 因为新的决策树里，叶片和果实都已经包含了根系检查(系统查本)，所以只需要跑一个主树即可
+    let moduleType = 'leaf';
+    if (positions.includes('leaf')) moduleType = 'leaf';
+    else if (positions.includes('fruit')) moduleType = 'fruit';
+    else if (positions.includes('root')) moduleType = 'leaf'; // 单测根系时，借用叶片树的后半段
 
-    const treeKey = `${crop}_${moduleType}`;
-    const treeData = decisionTrees[treeKey];
+    this.setData({ 
+      crop, 
+      module: moduleType,
+      isInitialized: false // 开始加载
+    });
 
-    if (!treeData) {
-      wx.showToast({ title: '配置缺失', icon: 'none' });
+    // 3. 读取数据
+    const treeKey = `${crop}_${moduleType}`; // 例如 "citrus_leaf"
+    this.treeData = decisionTrees[treeKey];
+
+    if (!this.treeData) {
+      wx.showModal({ 
+        title: '配置缺失', 
+        content: `未找到 ${treeKey} 的决策树数据，请检查文件名。`, 
+        showCancel: false 
+      });
       return;
     }
 
-    this.treeData = treeData;
-    this.userChoices = {};
-    this.tempDisease = null;
+    // 4. 启动引擎，加载 'start' 节点
     this.loadNode('start');
   },
 
+  // --- 核心：加载节点 ---
   loadNode(nodeId) {
     const node = this.treeData[nodeId];
-    if (!node) return;
-    this.setData({ currentNode: node, isInitialized: true });
+    
+    if (!node) {
+      console.error("Node not found:", nodeId);
+      wx.showToast({ title: '节点丢失', icon: 'error' });
+      return;
+    }
+
+    this.setData({
+      currentNode: node,
+      isInitialized: true // 【关键修复】数据加载完毕，解除 Loading 遮罩
+    });
   },
 
+  // --- 交互：点击选项 ---
+  // 对应 WXML 中的 bindtap="onOptionClick"
   onOptionClick(e) {
-    const option = e.currentTarget.dataset.item;
-    if (!option) return;
+    const item = e.currentTarget.dataset.item;
+    if (!item) return;
 
-    const currentNodeId = this.data.currentNode.id;
-    this.userChoices[currentNodeId] = option;
+    const currentId = this.data.currentNode.id;
 
-    // 【关键】捕获中间线索
-    // 如果用户选了“网状黄化”，这里会记录下 tempDiagnosis = 'deficiency_Fe_Zn'
-    if (option.tempDiagnosis) {
-      this.tempDisease = option.tempDiagnosis;
-      console.log(`🔍 线索捕获: ${this.tempDisease}`);
+    // 1. 记录答案
+    this.data.userChoices[currentId] = item;
+
+    // 2. 捕获线索 (tempDiagnosis) - 用于排除法
+    if (item.tempDiagnosis) {
+      this.setData({ tempDisease: item.tempDiagnosis });
+      console.log("🔍 捕获线索:", item.tempDiagnosis);
     }
 
-    if (option.isEnd) {
-      this.submitV5Diagnosis(option);
-    } else if (option.next) {
-      this.data.historyStack.push(currentNodeId);
-      this.loadNode(option.next);
+    // 3. 导航逻辑
+    if (item.isEnd) {
+      // 如果是终点，提交诊断
+      this.submitV6Diagnosis(item);
+    } else if (item.next) {
+      // 还有下一题，入栈并跳转
+      this.data.historyStack.push(currentId);
+      this.loadNode(item.next);
+    } else {
+      wx.showToast({ title: '流程配置错误: 无下文', icon: 'none' });
     }
   },
 
+  // --- 交互：回退 ---
   goBack() {
     if (this.data.historyStack.length === 0) {
       wx.navigateBack();
       return;
     }
-    const prevNodeId = this.data.historyStack.pop();
-    const currentId = this.data.currentNode.id;
-    delete this.userChoices[currentId];
-    // 回退不清除 tempDisease，保留记忆
-    this.loadNode(prevNodeId);
+    const prevId = this.data.historyStack.pop();
+    // 清除该步骤的答案，防止污染逻辑
+    delete this.data.userChoices[prevId];
+    this.loadNode(prevId);
   },
 
-  submitV5Diagnosis(lastOption) {
-    wx.showLoading({ title: '排除法分析中...', mask: true });
+  // ==========================================================
+  // 🚀 提交逻辑 (V6.0: 决策树结论 + 历史追溯 + 云端容灾)
+  // ==========================================================
+  async submitV6Diagnosis(lastOption) {
+    wx.showLoading({ title: '综合分析中...', mask: true });
 
-    // 1. 确定最终病害
-    // 优先级：最后一步的确诊 > 之前的疑似线索 > 未知
-    let finalDisease = lastOption.diagnosis;
+    // 1. 确定最终病害结论 (Final Decision)
+    let finalCode = lastOption.value; 
     
-    // 【核心修复：排除法逻辑】
-    // 如果最后一步是“排除根结”或“正常”，导致没有 diagnosis，
-    // 那么就应该启用之前捕获的 tempDisease（比如缺素）作为最终结论。
-    if (!finalDisease || finalDisease === 'unknown') {
-        if (this.tempDisease) {
-            finalDisease = this.tempDisease;
-            console.log(`✅ 启用排除法，回溯确诊: ${finalDisease}`);
-        } else {
-            finalDisease = "unknown";
-        }
+    // 【排除法逻辑】
+    // 如果最后一步只是排除项（例如 "no_knot" 无根结），则回溯使用之前的疑似线索
+    if (lastOption.tempDiagnosis) {
+        finalCode = lastOption.tempDiagnosis;
+    } else if (this.data.tempDisease && (!finalCode || finalCode.indexOf('knot') > -1 || finalCode === 'root_healthy' || finalCode === 'no_knot')) {
+        finalCode = this.data.tempDisease; 
+        console.log("✅ 启用排除法，确诊为:", finalCode);
     }
+
+    // 2. 构造特征列表 (传给算法引擎计算复合风险)
+    const answers = { leaf: [], fruit: [], root: [] };
     
-    // 2. 特征提取
-    const allFeatures = [];
-    Object.values(this.userChoices).forEach(choice => {
-      if (choice && choice.value) {
-        allFeatures.push(choice.value);
+    // 将用户一路选过来的所有 value 收集起来
+    Object.values(this.data.userChoices).forEach(choice => {
+      const v = choice.value;
+      if (v) {
+        if (v.startsWith('root_') || v.includes('soil') || v.includes('knot')) answers.root.push(v);
+        else if (this.data.module === 'fruit') answers.fruit.push(v);
+        else answers.leaf.push(v);
       }
     });
 
-    const simulatedAnswers = { leaf: [], fruit: [], root: [] };
-
-    // 3. 特征分发与转译
-    const choices = this.userChoices;
-    const knotVal  = (choices['q_system_knot'] || {}).value;
-    const smellVal = (choices['q_system_smell'] || {}).value;
-    const touchVal = (choices['q_system_touch'] || {}).value;
-
-    // 分发普通特征
-    allFeatures.forEach(feat => {
-      if (feat.startsWith('root_')) simulatedAnswers.root.push(feat);
-      else if (this.data.module === 'leaf') simulatedAnswers.leaf.push(feat);
-      else simulatedAnswers.fruit.push(feat);
-    });
-
-    // 【核心修复：显式注入健康信号】
-    // 如果用户明确排除了根部问题，我们要告诉引擎“根是好的”，
-    // 这样引擎才能放心地把缺素症的置信度拉高。
-    if (knotVal === 'no_knot') simulatedAnswers.root.push('root_healthy'); 
-    if (touchVal === 'soil_loose') simulatedAnswers.root.push('root_healthy');
-    
-    // 注入病害特征
-    if (knotVal === 'has_knot') simulatedAnswers.root.push('root_knots');
-    if (smellVal === 'sour_smell') simulatedAnswers.root.push('root_rot_smell');
-    if (touchVal === 'dry_root') simulatedAnswers.root.push('root_burn_dry');
-
-    // 4. 获取历史
+    // 3. 获取历史记录 (双重容灾)
     let lastRecord = null;
     try {
+      // A. 优先查本地
       const history = wx.getStorageSync('diagnosisRecords') || [];
-      if (Array.isArray(history) && history.length > 0 && history[0].result) {
-        lastRecord = {
-          diagnosis: history[0].result.diagnosis,
-          timestamp: history[0].id
+      if (history.length > 0 && history[0].result) {
+        lastRecord = { 
+          diagnosis: history[0].result.diagnosis, 
+          timestamp: history[0].id 
         };
+        console.log("📜 [历史] 命中本地:", lastRecord.diagnosis);
       }
-    } catch (e) {}
+      // B. 降级查云端
+      if (!lastRecord) {
+        const cloudRes = await wx.cloud.callFunction({
+          name: 'orchardFunctions',
+          data: { type: 'getHistoryList' }
+        });
+        if (cloudRes.result?.data?.[0]) {
+          const cData = cloudRes.result.data[0];
+          lastRecord = {
+            diagnosis: cData.diagnosis,
+            timestamp: cData.timestamp || new Date(cData.createTime).getTime()
+          };
+          console.log("☁️ [历史] 命中云端:", lastRecord.diagnosis);
+        }
+      }
+    } catch (e) { console.error("历史获取失败", e); }
 
-    console.log("🚀 [V4.3] 提交特征:", simulatedAnswers);
+    // 4. 调用算法引擎
+    try {
+        const engine = app.globalData.diagnosticEngine;
+        
+        // 【Hack技巧】: 为了确保引擎能识别出决策树的结论，我们将 finalCode 强行加入特征列表
+        if (finalCode && finalCode !== 'no_knot' && finalCode !== 'root_healthy') {
+            if (this.data.module === 'leaf') answers.leaf.push(finalCode);
+            else answers.fruit.push(finalCode);
+        }
 
-    // 5. 调用引擎
-    const engine = app.globalData.diagnosticEngine;
-    let resultPayload = engine.runCombined({
-      positions: [this.data.module],
-      answers: simulatedAnswers,
-      month: new Date().getMonth() + 1,
-      crop: this.data.crop,
-      lastRecord: lastRecord
-    });
+        const result = engine.runCombined({
+            answers,
+            month: new Date().getMonth() + 1,
+            crop: this.data.crop,
+            lastRecord
+        });
 
-    // 6. 强力保底 (Double Safety)
-    // 如果引擎因为权重配置问题算分太低（unknown），
-    // 且我们通过决策树逻辑已经锁定了 finalDisease，则强制覆盖。
-    if (resultPayload.diagnosis === 'unknown' && finalDisease !== 'unknown') {
-      console.log("🛡️ 触发保底逻辑，强制确诊:", finalDisease);
-      resultPayload.diagnosis = finalDisease;
-      resultPayload.confidence = 90; // 排除法确诊，置信度很高
-      resultPayload.dynamicLogic = `经根部排查未见明显异常，综合叶片表现，判定为【${finalDisease}】。`;
-      
-      // 修正标签
-      resultPayload.tags = [finalDisease]; 
+        // 【强力保底】: 如果引擎算分失败(unknown)，但决策树有明确结论，强制覆盖
+        if (result.diagnosis === 'unknown' && finalCode && finalCode !== 'unknown') {
+             result.diagnosis = finalCode; 
+             result.confidence = 95;
+             console.log("🛡️ 触发保底逻辑，强制采用:", finalCode);
+        }
+
+        // 5. 存储并跳转
+        wx.setStorageSync('temp_diagnosis_result', result);
+        
+        setTimeout(() => {
+            wx.hideLoading();
+            wx.redirectTo({ url: '/pages/diagnosis/result/result' });
+        }, 500);
+
+    } catch (err) {
+        wx.hideLoading();
+        console.error(err);
+        wx.showModal({ title: 'Error', content: '诊断分析出错', showCancel:false });
     }
-
-    // 7. 存储与跳转
-    setTimeout(() => {
-      wx.setStorageSync('temp_diagnosis_result', resultPayload);
-      wx.hideLoading(); 
-      wx.redirectTo({ url: '/pages/diagnosis/result/result' });
-    }, 500);
   }
 });

@@ -1,15 +1,26 @@
-<!-- pages/cropSelect/cropSelect.wxml -->
 <view class="container">
-  <view class="title">请选择作物类型</view>
-  <view class="crop-list">
-    <block wx:for="{{crops}}" wx:key="type">
+  <view class="header">
+    <view class="title">请选择作物</view>
+    <view class="subtitle">Select Your Crop</view>
+  </view>
+
+  <view class="grid-container">
+    <block wx:for="{{crops}}" wx:key="id">
       <view 
-        class="crop-item" 
+        class="crop-card {{item.active ? '' : 'disabled'}}" 
         bindtap="selectCrop" 
-        data-type="{{item.type}}"
+        data-id="{{item.id}}" 
+        data-name="{{item.name}}"
+        data-active="{{item.active}}"
       >
-        <text class="icon">{{item.icon}}</text>
-        <text class="name">{{item.name}}</text>
+        <view class="icon">{{item.icon}}</view>
+        <view class="info">
+          <text class="name">{{item.name}}</text>
+          <text class="desc">{{item.desc}}</text>
+        </view>
+        
+        <view class="tag" wx:if="{{!item.active}}">开发中</view>
+        <view class="arrow" wx:else>→</view>
       </view>
     </block>
   </view>
