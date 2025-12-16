@@ -1,0 +1,43 @@
+<view class="page">
+  <view class="header">
+    <text class="header-title">诊断历史</text>
+    <button class="header-btn" bindtap="clearAll" wx:if="{{records.length > 0}}">清空记录</button>
+  </view>
+
+  <view wx:if="{{records.length === 0}}" class="empty">
+    <text style="font-size: 80rpx; margin-bottom: 20rpx;">🍃</text>
+    <text class="empty-title">暂无历史记录</text>
+    <text class="empty-sub">完成一次诊断后，结果会自动保存在这里。</text>
+  </view>
+
+  <scroll-view wx:if="{{records.length > 0}}" scroll-y="true" class="list">
+    <block wx:for="{{records}}" wx:key="id">
+      <view class="card">
+        
+        <view class="card-header">
+          <view class="card-header-left">
+            <text class="crop">{{item.displayCrop}}</text>
+            <text class="time">{{item.time}}</text>
+          </view>
+          
+          <view wx:if="{{item.mainSeverityLabel}}" 
+                class="tag {{item.mainSeverityClass}}">
+            {{item.mainSeverityLabel}}
+          </view>
+        </view>
+
+        <view class="card-body">
+          <text class="summary-label">诊断结论：</text>
+          <text class="summary-text" user-select="true">{{item.summary}}</text>
+        </view>
+
+        <view wx:if="{{item.systemBrief}}" class="card-footer">
+          <text class="footer-icon">📊</text>
+          <text class="footer-text">{{item.systemBrief}}</text>
+        </view>
+
+      </view>
+    </block>
+    <view style="height: 40rpx;"></view>
+  </scroll-view>
+</view>

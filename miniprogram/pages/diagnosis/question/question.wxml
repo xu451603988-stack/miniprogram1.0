@@ -1,0 +1,43 @@
+<view class="page-container" wx:if="{{isInitialized}}">
+
+<view class="nav-header">
+  <view class="back-btn" bindtap="goBack">
+    <text class="back-icon">‹</text> 
+    <text>上一步</text>
+  </view>
+  <view class="step-indicator">智能诊断中...</view>
+</view>
+
+<view class="question-card fade-in">
+  <view class="question-title-box">
+    <view class="q-icon">❓</view>
+    <text class="question-title">{{currentNode.title}}</text>
+  </view>
+
+  <view class="options-list">
+    <block wx:for="{{currentNode.options}}" wx:key="value">
+      <view 
+        class="option-item" 
+        hover-class="option-hover"
+        bindtap="onOptionClick"
+        data-item="{{item}}"
+      >
+        <view class="option-dot"></view>
+        
+        <text class="option-label">{{item.label}}</text>
+        
+        <text class="option-arrow">›</text>
+      </view>
+    </block>
+  </view>
+</view>
+
+<view class="footer-hint">
+  <text>基于《中药农业》系统辨证逻辑实时分析</text>
+</view>
+
+</view>
+
+<view wx:else class="loading-box">
+<text class="loading-text">正在加载诊断逻辑...</text>
+</view>

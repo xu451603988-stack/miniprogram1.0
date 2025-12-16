@@ -1,0 +1,71 @@
+<view class="page-v4" wx:if="{{resultType === 'decision_tree_v5'}}">
+  
+  <view class="result-card {{report.severity}}">
+    <view class="card-header">
+      <view class="risk-tag">
+        <text class="risk-icon">⚠️</text>
+        <text>{{report.severityLabel}}</text>
+      </view>
+      <text class="date">{{report.time}}</text>
+    </view>
+    
+    <view class="diagnosis-name">{{report.title}}</view>
+    
+    <view class="tags-row">
+      <text wx:for="{{report.tags}}" wx:key="*this" class="tag">{{item}}</text>
+    </view>
+
+    <view class="risk-bar-container">
+      <view class="risk-bar-label">风险指数</view>
+      <view class="risk-track">
+        <view class="risk-fill" 
+              style="width: {{report.severity === 'severe' ? '90%' : (report.severity === 'moderate' ? '60%' : '30%')}}">
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-box">
+    <view class="section-title">
+      <text class="icon">🔍</text> 专家辨证
+    </view>
+    <view class="logic-content">
+      <text user-select="true">{{report.logic}}</text>
+    </view>
+  </view>
+
+  <view class="section-box">
+    <view class="section-title">
+      <text class="icon">💊</text> 调理方案
+    </view>
+    <view class="solution-list">
+      <block wx:for="{{report.solutions}}" wx:key="index">
+        <view class="solution-item">
+          <view class="sol-type {{item.type === '系统固本' ? 'root-type' : 'cure-type'}}">
+            {{item.type || '建议'}}
+          </view>
+          <view class="sol-text" user-select="true">{{item.content}}</view>
+        </view>
+      </block>
+      <view wx:if="{{report.solutions.length === 0}}" class="empty-tip">
+        <text>暂无特定药物建议，请参考系统调理方案。</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="footer-btn-group">
+    <button class="btn-secondary" bindtap="goHome">返回首页</button>
+    <button class="btn-primary" bindtap="retest">重新诊断</button>
+  </view>
+  <button class="btn-text" bindtap="contactDoctor">联系植保专家</button>
+
+</view>
+
+<view wx:else>
+  <view class="page">
+    <view class="summary-card">
+      <text>旧版数据格式，建议重新测试。</text>
+    </view>
+    <button class="btn-primary" bindtap="retest" style="margin-top:40rpx;">重新测试</button>
+  </view>
+</view>

@@ -1,0 +1,39 @@
+<view class="page-container">
+  <view class="icon-container">
+    <text class="crop-icon">🌱</text>
+  </view>
+
+  <view class="title-wrapper">
+    <text class="main-title">作物诊断小助手</text>
+    <text class="sub-title">中医四诊 · 科学辨病</text>
+  </view>
+
+  <view class="button-container">
+    <button 
+      class="diagnose-button" 
+      bindtap="goToForm"
+      hover-class="btn-hover"
+    >
+      <text>开始新诊断</text>
+      <text class="arrow-icon">→</text>
+    </button>
+  </view>
+
+  <view class="recent-card" wx:if="{{lastRecord}}" bindtap="viewRecord">
+    <view class="recent-header">
+      <text class="recent-label">最近诊断</text>
+      <text class="recent-time">{{lastRecord.time}}</text>
+    </view>
+    <view class="recent-content">
+      <view class="recent-info">
+        <text class="recent-title">{{lastRecord.summary}}</text>
+        <text class="recent-tags">{{lastRecord.systemBrief}}</text>
+      </view>
+      <view class="status-dot {{lastRecord.mainSeverityClass}}"></view>
+    </view>
+  </view>
+
+  <view class="footer">
+    <text class="footer-text">基于 V5.0 决策引擎 · 精准匹配调理方案</text>
+  </view>
+</view>

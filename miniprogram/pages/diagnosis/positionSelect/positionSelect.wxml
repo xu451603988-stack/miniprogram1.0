@@ -1,0 +1,49 @@
+<!-- miniprogram/pages/diagnosis/positionSelect/positionSelect.wxml -->
+
+<view class="page">
+
+<!-- 顶部说明 -->
+<view class="header">
+  <view class="title">请选择目前怀疑有问题的位置</view>
+  <view class="subtitle">可多选，后续会依次对所选部位进行诊断，根系会在最后统一检查。</view>
+</view>
+
+<!-- 位置选项列表 -->
+<view class="position-list">
+  <view
+    class="position-card {{item.selected ? 'position-card-selected' : ''}}"
+    wx:for="{{positions}}"
+    wx:key="id"
+    data-id="{{item.id}}"
+    bindtap="onTogglePosition"
+  >
+    <view class="left">
+      <text class="icon">{{item.icon}}</text>
+    </view>
+
+    <view class="middle">
+      <text class="name">{{item.name}}</text>
+      <text class="desc">{{item.desc}}</text>
+    </view>
+
+    <view class="right">
+      <view class="checkbox {{item.selected ? 'checked' : ''}}">
+        <text wx:if="{{item.selected}}">✔</text>
+      </view>
+    </view>
+  </view>
+</view>
+
+<!-- 底部提示 -->
+<view class="hint">
+  <text class="hint-text">
+    小提示：根系诊断为必选项，会在叶/果诊断完成后自动进入。
+  </text>
+</view>
+
+<!-- 底部按钮 -->
+<view class="footer">
+  <button class="start-btn" bindtap="onStartDiagnosis">开始诊断</button>
+</view>
+
+</view>
