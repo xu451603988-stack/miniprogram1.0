@@ -1,0 +1,44 @@
+/** miniprogram/app.wxss **/
+page {
+  /* --- 国际范·植保绿配色 --- */
+  /* 主色：深邃的叶绿 */
+  --primary-color: #166534; 
+  /* 辅色：鲜亮的嫩绿 */
+  --secondary-color: #22c55e;
+  /* 渐变：用于大卡片和按钮 */
+  --primary-gradient: linear-gradient(135deg, #166534 0%, #15803d 100%);
+  /* 强调色：用于高亮标签 */
+  --accent-color: #dcfce7;
+  
+  /* 背景色：极淡的灰绿 */
+  --bg-color-light: #f0fdf4;
+  
+  /* 统一字体 */
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, sans-serif;
+  
+  /* 默认底色 */
+  background: var(--bg-color-light);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  box-sizing: border-box;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+} 
+
+button {
+  background: initial;
+}
+
+button:focus{
+  outline: 0;
+}
+
+button::after{
+  border: none;
+}

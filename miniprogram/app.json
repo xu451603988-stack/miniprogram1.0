@@ -1,0 +1,22 @@
+{
+  "pages": [
+    "pages/diagnosis/welcome/welcome",
+    "pages/diagnosis/cropSelect/cropSelect",
+    "pages/diagnosis/positionSelect/positionSelect",
+    "pages/diagnosis/question/question",
+    "pages/diagnosis/result/result",
+    "pages/diagnosis/history/history",
+    "pages/diagnosis/expert/expert",
+    "pages/user/user",
+    "pages/orchard/orchard",
+    "pages/index/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#166534",
+    "navigationBarTitleText": "作物健康诊断",
+    "navigationBarTextStyle": "white"
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2"
+}
