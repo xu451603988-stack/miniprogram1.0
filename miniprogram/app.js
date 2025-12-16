@@ -1,5 +1,6 @@
 // miniprogram/app.js
-const NewDiagnosticEngine = require('./utils/newDiagnosticEngine');
+// 1. 【修改这里】引入刚才新建的 citrus_algo.js 核心算法文件
+const CitrusAlgo = require('./utils/citrus_algo.js');
 
 App({
   onLaunch: function () {
@@ -8,7 +9,7 @@ App({
       console.error('请使用 2.2.3 或以上的基础库以使用云能力');
     } else {
       wx.cloud.init({
-        // 您的环境ID (从之前的截图获取)
+        // 您的环境ID (保持原有配置不变)
         env: 'cloud1-8gxcf60t4e66ca9d', 
         traceUser: true,
       });
@@ -27,13 +28,14 @@ App({
 
   // 初始化诊断引擎的方法
   _initDiagnosticEngine: function() {
-    this.globalData.diagnosticEngine = NewDiagnosticEngine;
+    // 2. 【修改这里】将全局诊断引擎指向新的 CitrusAlgo
+    this.globalData.diagnosticEngine = CitrusAlgo;
     
     // 自动更新月份
     const currentMonth = new Date().getMonth() + 1;
     this.globalData.currentMonth = currentMonth;
     
-    console.log(`✅ 系统初始化完成，当前月份: ${currentMonth}`);
+    console.log(`✅ 系统已切换至 [CitrusAlgo 治未病引擎]，当前月份: ${currentMonth}`);
   },
 
   // 全局数据
