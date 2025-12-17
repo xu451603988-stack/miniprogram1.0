@@ -1,300 +1,199 @@
 // miniprogram/data/decision_trees/citrus_leaf.js
-// 柑橘叶片诊断决策树 (V5.0 中医式系统诊断版)
-// 核心逻辑：主诉定象 -> 辨证排除 -> 强制查本 -> 综合定性
+// 柑橘叶片与根系决策树 V5.1 (国际植保标准版)
+// 包含：叶片(颜色/形态/病斑) + 根系(质地/形态)
 
 module.exports = {
-  // ================= 第一阶段：望诊定象 (主诉入口) =================
+  // ================= 第一阶段：叶片望诊 (Visual Diagnosis) =================
   "start": {
     id: "start",
-    title: "【望诊】请仔细观察，叶片最主要的异常表现是什么？",
+    title: "【望诊】请观察叶片，最明显的异常属于哪一类？",
     type: "single",
     options: [
       { 
-        label: "叶片卷曲 / 皱缩 / 畸形", 
-        value: "curl", 
-        next: "q_curl_direction" 
+        label: "颜色异常 (发黄/花叶/白化)", 
+        value: "color_issue", 
+        next: "q_leaf_color_pattern" 
       },
       { 
-        label: "叶片颜色发黄 (黄化)", 
-        value: "yellow", 
-        next: "q_yellow_pattern" 
+        label: "形态异常 (卷曲/畸形/枯焦)", 
+        value: "shape_issue", 
+        next: "q_leaf_shape_type" 
       },
       { 
-        label: "叶面有斑点 / 坏死 / 霉层", 
-        value: "spots", 
-        next: "q_spot_type" 
-      },
-      { 
-        label: "以上都不是 (落叶/干枯/树势弱)", 
-        value: "other", 
-        next: "q_system_check_entry" // 不典型症状，直接查系统体质
+        label: "表面病斑 (斑点/霉层/虫道)", 
+        value: "lesion_issue", 
+        next: "q_leaf_lesion_type" 
       }
     ]
   },
 
-  // ================= 分支 A：卷叶辨证逻辑 =================
-  "q_curl_direction": {
-    id: "q_curl_direction",
-    title: "【望诊】请观察叶片卷曲的方向及形态？",
+  // --- 分支 A：颜色辨证 (Color) ---
+  "q_leaf_color_pattern": {
+    id: "q_leaf_color_pattern",
+    title: "【辨证】请仔细观察黄化的具体纹路特征？",
     type: "single",
     options: [
       { 
-        label: "向上卷（像小船一样，向叶面合拢）", 
-        value: "curl_up", 
-        // 逻辑：上卷多为非生物因素（缺水/药害/根弱），需排除法
-        next: "q_exclude_herbicide" 
+        label: "斑驳黄化 (黄绿相间不对称，花叶)", 
+        value: "mottling_yellow", 
+        tempDiagnosis: "hlb", // 疑似黄龙病
+        next: "q_system_check_entry" 
       },
       { 
-        label: "向下卷（呈扣状，向叶背方向卷）", 
+        label: "网状黄化 (叶脉绿，脉间肉黄/白)", 
+        value: "interveinal_chlorosis", 
+        tempDiagnosis: "deficiency_Fe_Zn", // 缺铁/锌
+        next: "q_system_check_entry" 
+      },
+      { 
+        label: "倒V字黄斑 (仅老叶基部黄，尖端绿)", 
+        value: "inverted_v_yellow", 
+        tempDiagnosis: "deficiency_Mg", // 缺镁
+        next: "q_system_check_entry" 
+      },
+      { 
+        label: "脉肿黄化 (叶脉肿大木栓化/发黄)", 
+        value: "vein_chlorosis", 
+        tempDiagnosis: "deficiency_B", // 缺硼/衰退
+        next: "q_system_check_entry" 
+      },
+      { 
+        label: "均匀黄化 (全叶枯黄/无光泽)", 
+        value: "uniform_yellow", 
+        // 可能是缺氮或根腐，必须查根
+        next: "q_system_check_entry" 
+      },
+      { 
+        label: "灰白失绿 (密布针尖状小白点)", 
+        value: "red_spider_symptoms", 
+        tempDiagnosis: "red_spider", 
+        next: "q_system_check_entry" 
+      }
+    ]
+  },
+
+  // --- 分支 B：形态辨证 (Shape) ---
+  "q_leaf_shape_type": {
+    id: "q_leaf_shape_type",
+    title: "【辨证】叶片的形状发生了什么变化？",
+    type: "single",
+    options: [
+      { 
+        label: "向叶背反卷 (像扣过来的船)", 
         value: "curl_down", 
-        // 逻辑：下卷90%是虫害（蚜虫）或缺钙，直接查虫
-        next: "q_check_bugs" 
+        next: "q_check_leaf_back" // 查虫或根
       },
-      {
-        label: "扭曲 / 畸形 / 呈鸡爪状 / 细长", 
-        value: "distorted", 
-        // 逻辑：畸形通常是激素中毒或病毒，需问历史
-        next: "q_ask_history_spray" 
-      }
-    ]
-  },
-
-  // --- A1. 上卷排除法：查药害 ---
-  "q_exclude_herbicide": {
-    id: "q_exclude_herbicide",
-    title: "【问诊】近期（15天内）果园是否打过除草剂、保果药或高浓度农药？",
-    type: "single",
-    options: [
       { 
-        label: "是，近期刚打过此类药", 
-        value: "yes_drug", 
-        // 暂定结论：药害，但仍需查根看解毒能力
-        tempDiagnosis: "herbicide_damage", 
+        label: "向叶面正卷 (U形卷曲/筒状)", 
+        value: "curl_up", 
+        tempDiagnosis: "drought_stress", // 暂定干旱，需查根确认
         next: "q_system_check_entry" 
       },
       { 
-        label: "否，近期没打过或很久前打的", 
-        value: "no_drug", 
-        // 排除药害，下一步查水分
-        next: "q_check_water_status" 
-      }
-    ]
-  },
-
-  // --- A2. 上卷排除法：查水分（真旱还是假旱） ---
-  "q_check_water_status": {
-    id: "q_check_water_status",
-    title: "【切诊】请用手摸一下根际土壤，干湿度如何？",
-    type: "single",
-    options: [
-      { 
-        label: "土很干，捏不成团，发白", 
-        value: "dry_soil", 
-        tempDiagnosis: "drought_stress", // 结论：真干旱
-        next: "q_system_check_entry" // 虽确诊干旱，也要查根系受损程度
-      },
-      { 
-        label: "土是湿润的，甚至有积水/泥泞", 
-        value: "wet_soil", 
-        // 逻辑：土湿但叶卷 -> 根烂了吸不到水 -> 假干旱
-        // 此时不给结论，直接去查根结和腐烂
-        next: "q_system_check_root_knot" 
-      }
-    ]
-  },
-
-  // --- A3. 下卷查虫 ---
-  "q_check_bugs": {
-    id: "q_check_bugs",
-    title: "【查体】请翻开叶片背面，是否有活动虫体、粘液或蜕皮？",
-    type: "single",
-    options: [
-      { 
-        label: "有黑色/绿色/黄色小虫 (蚜虫/木虱)", 
-        value: "found_aphid", 
-        tempDiagnosis: "aphid", 
+        label: "畸形/狭小/直立 (像辣椒叶)", 
+        value: "small_stiff", 
+        tempDiagnosis: "deficiency_Fe_Zn", // 缺锌典型
         next: "q_system_check_entry" 
       },
       { 
-        label: "有白色粉虱飞舞", 
-        value: "found_whitefly", 
-        tempDiagnosis: "whitefly", 
-        next: "q_system_check_entry"
-      },
-      { 
-        label: "很干净，没虫", 
-        value: "no_bugs", 
-        // 逻辑：没虫却反卷，可能是缺钙（老叶）或微量元素失调
-        tempDiagnosis: "deficiency_Ca_B",
+        label: "叶缘/叶尖焦枯 (像火烧过)", 
+        value: "tip_burn", 
+        tempDiagnosis: "root_burn", // 肥害/热害
         next: "q_system_check_entry" 
       }
     ]
   },
 
-  // --- A4. 畸形查历史 ---
-  "q_ask_history_spray": {
-    id: "q_ask_history_spray",
-    title: "【问诊】这种畸形是在打药/施肥后几天内突然出现的吗？",
+  "q_check_leaf_back": {
+    id: "q_check_leaf_back",
+    title: "【查体】翻开卷叶背面，是否发现虫体或排泄物？",
     type: "single",
     options: [
-      { 
-        label: "是，农事操作后突然出现", 
-        value: "acute", 
-        tempDiagnosis: "phytotoxicity", // 急性药害
-        next: "q_system_check_entry" 
-      },
-      { 
-        label: "不是，慢慢长出来就是这样", 
-        value: "chronic", 
-        tempDiagnosis: "viral_disease", // 病毒病或缺锌
-        next: "q_system_check_entry" 
-      }
+      { label: "有蚜虫/木虱/粉虱 (或蜜露)", value: "aphid", tempDiagnosis: "aphid", next: "q_system_check_entry" },
+      { label: "非常干净，无虫", value: "no_bugs", tempDiagnosis: "weak_root", next: "q_system_check_entry" } // 无虫反卷多为根弱
     ]
   },
 
-  // ================= 分支 B：黄化辨证逻辑 =================
-  "q_yellow_pattern": {
-    id: "q_yellow_pattern",
-    title: "【望诊】请仔细辨别黄化的具体纹路？",
+  // --- 分支 C：病斑辨证 (Lesion) ---
+  "q_leaf_lesion_type": {
+    id: "q_leaf_lesion_type",
+    title: "【查体】请描述病斑的具体形态？",
     type: "single",
     options: [
       { 
-        label: "斑驳黄化 (不对称/黄绿相间/红鼻子果)", 
-        value: "mottled", 
-        next: "q_hlb_confirm" // 疑似黄龙病高危
-      },
-      { 
-        label: "网状黄化 (叶脉绿、叶肉黄)", 
-        value: "interveinal", 
-        next: "q_leaf_age_check" // 缺素特征
-      },
-      { 
-        label: "均匀黄化 (全叶发黄) 或 脉肿发黄", 
-        value: "uniform", 
-        // 全黄通常是根系大问题
-        next: "q_system_check_entry" 
-      }
-    ]
-  },
-
-  "q_hlb_confirm": {
-    id: "q_hlb_confirm",
-    title: "【问诊】该树是否伴有“红鼻子果”或比周围树落果更严重？",
-    type: "single",
-    options: [
-      { label: "是，有红鼻子果/落果严重", value: "yes", tempDiagnosis: "HLB_strong_suspect", next: "q_system_check_entry" },
-      { label: "否，果实正常", value: "no", tempDiagnosis: "deficiency_Zn_suspect", next: "q_system_check_entry" }
-    ]
-  },
-
-  "q_leaf_age_check": {
-    id: "q_leaf_age_check",
-    title: "【辨证】这种黄化主要出现在树的哪个部位？",
-    type: "single",
-    options: [
-      { label: "新梢嫩叶 (顶部)", value: "new", tempDiagnosis: "deficiency_Fe_Zn", next: "q_system_check_entry" },
-      { label: "老熟叶片 (中下部)", value: "old", tempDiagnosis: "deficiency_Mg", next: "q_system_check_entry" }
-    ]
-  },
-
-  // ================= 分支 C：斑点辨证逻辑 =================
-  "q_spot_type": {
-    id: "q_spot_type",
-    title: "【望诊】请描述斑点的形态特征？",
-    type: "single",
-    options: [
-      { 
-        label: "火山口状开裂，摸起来挡手粗糙", 
-        value: "canker_like", 
-        tempDiagnosis: "canker", 
-        next: "q_system_check_entry" 
-      },
-      { 
-        label: "银白色/灰白色的蜿蜒虫道 (鬼画符)", 
-        value: "miner_trails", 
+        label: "银白色弯曲虫道 (鬼画符)", 
+        value: "leaf_miner_trails", 
         tempDiagnosis: "leaf_miner", 
         next: "q_system_check_entry" 
       },
       { 
-        label: "红点/白点，叶面失去光泽", 
-        value: "red_spider_spots", 
-        tempDiagnosis: "red_spider", 
-        next: "q_system_check_entry"
+        label: "火山口状开裂 (摸起来粗糙挡手)", 
+        value: "canker_spots", 
+        tempDiagnosis: "canker", 
+        next: "q_system_check_entry" 
       },
       { 
-        label: "褐色霉层 / 轮纹斑 / 腐烂斑", 
-        value: "fungal_like", 
-        tempDiagnosis: "fungal_generic", // 泛指炭疽/砂皮等
+        label: "褐色轮纹斑/腐烂斑 (有霉层)", 
+        value: "anthracnose_spots", 
+        tempDiagnosis: "anthracnose", 
+        next: "q_system_check_entry" 
+      },
+      { 
+        label: "黑色煤烟状粉末 (煤污)", 
+        value: "sooty_mold", 
+        tempDiagnosis: "scale_insect", // 煤污多由蚧壳虫/蚜虫引起
         next: "q_system_check_entry" 
       }
     ]
   },
 
-  // ================= 第二阶段：系统查本 (System Check) =================
-  // 核心思想：根是本，叶是标。所有流程最终汇聚于此。
+  // ================= 第二阶段：系统查本 (Root & Soil) =================
+  // 这里就是你截图里那个界面的升级版逻辑
 
   "q_system_check_entry": {
     id: "q_system_check_entry",
-    title: "【系统查本】表象信息已收集，最后必须检查根际环境，这决定了能否“断根治疗”。",
+    title: "【系统查本】叶片表象已确认。最后请务必检查根际环境，这是“治本”的关键。",
     type: "single", 
     options: [
-      { label: "开始检查根部 (闻/切/看)", value: "continue", next: "q_system_smell" }
-    ]
-  },
-
-  "q_system_smell": {
-    id: "q_system_smell",
-    title: "【闻诊】抓一把根际深处的土壤闻一下，气味是？",
-    type: "single",
-    options: [
-      { 
-        label: "有酸馊味 / 腥臭味 / 酒精味", 
-        value: "sour_smell", 
-        // 闻出问题，说明湿热/厌氧
-        next: "q_system_touch" 
-      },
-      { 
-        label: "刺鼻的氨味 (化肥味)", 
-        value: "ammonia_smell", 
-        next: "q_system_touch" 
-      },
-      { 
-        label: "无异味 / 正常泥土香", 
-        value: "normal_smell", 
-        next: "q_system_touch" 
-      }
+      { label: "开始检查根部 (切/望/闻)", value: "continue", next: "q_system_touch" }
     ]
   },
 
   "q_system_touch": {
     id: "q_system_touch",
-    title: "【切诊】用手捏土壤和根系，质地手感如何？",
+    title: "【切诊】用手捏一下根系和土壤，手感和质地如何？",
     type: "single",
     options: [
-      { label: "土粘重板结 / 根系皮肉分离(脱皮)", value: "bad_root", next: "q_system_knot" },
-      { label: "土质疏松 / 根系切口发白", value: "good_root", next: "q_system_knot" },
-      { label: "根系干枯 / 一折就断", value: "dry_root", next: "q_system_knot" }
-    ]
-  },
-  
-  "q_system_check_root_knot": { // 卷叶分支专用的跳板
-    id: "q_system_check_root_knot",
-    title: "【查本】既然土壤湿润但叶片卷曲，请务必检查根部是否有根结？",
-    type: "single",
-    options: [
-      { label: "有根结 / 肿块", value: "has_knot", isEnd: true }, 
-      { label: "没有根结，但根发黑腐烂", value: "no_knot_rot", isEnd: true },
-      { label: "根系完好", value: "root_ok", isEnd: true }
+      { 
+        label: "根皮腐烂，手捏软烂脱皮 (伴有酸臭味)", 
+        value: "root_rot_smell", 
+        next: "q_system_knot" 
+      },
+      { 
+        label: "根系干枯变黑，发脆一折就断 (像干柴)", 
+        value: "root_burn_dry", 
+        next: "q_system_knot" 
+      },
+      { 
+        label: "根系颜色发红/发褐，僵硬无新根 (僵苗)", 
+        value: "root_red_stagnant", 
+        next: "q_system_knot" 
+      },
+      { 
+        label: "根系新鲜有弹性，断面发白 (正常)", 
+        value: "root_healthy", 
+        next: "q_system_knot" 
+      }
     ]
   },
 
-  "q_system_knot": { // 通用终点
+  "q_system_knot": {
     id: "q_system_knot",
-    title: "【望诊】侧根或须根上是否有“米粒大小的肿块”（根结）？",
+    title: "【望诊】侧根或须根上是否有“米粒大小的肿块”(根结)？",
     type: "single",
     options: [
-      { label: "有根结", value: "has_knot", isEnd: true }, // 流程结束，提交诊断
-      { label: "没有根结", value: "no_knot", isEnd: true }  // 流程结束，提交诊断
+      { label: "有根结 (串珠状肿大)", value: "has_knot", isEnd: true }, 
+      { label: "光滑无根结", value: "no_knot", isEnd: true }
     ]
   }
 };
