@@ -1,53 +1,40 @@
-<view class="welcome-page">
-
-<view class="decorative-circle c1"></view>
-<view class="decorative-circle c2"></view>
-
-<view class="hero-section">
-  <view class="brand-pill">
-    <text class="dot"></text> V5.0 专家系统引擎
+<view class="container">
+  <view class="header">
+    <view class="tag">V5.0 专家系统引擎</view>
+    <text class="title">作物健康\n智能诊断助手</text>
+    <text class="subtitle">融合“中医植保”理念与现代病理学，3分钟快速定位病害根源。</text>
   </view>
-  <view class="hero-title">
-    <text class="line1">作物健康</text>
-    <text class="line2">智能诊断助手</text>
-  </view>
-  <view class="hero-desc">
-    融合“中医植保”理念与现代病理学，3分钟快速定位病害根源。
-  </view>
-</view>
 
-<view class="cards-container">
-  <view class="feature-card main-card" bindtap="goStart">
-    <view class="card-icon-box">🔍</view>
-    <view class="card-info">
-      <text class="card-title">开始诊断</text>
-      <text class="card-sub">拍摄或描述症状，获取方案</text>
+  <view class="main-action-area">
+    <view class="start-card" bindtap="onStart">
+      <view class="icon-circle">
+        <image class="main-icon" src="../../images/icons/search.png" mode="aspectFit"></image> <text class="icon-emoji">🔍</text>
+      </view>
+      <view class="text-group">
+        <text class="card-title">开始诊断</text>
+        <text class="card-desc">拍摄 or 描述症状，获取方案</text>
+      </view>
+      <view class="arrow-btn">→</view>
     </view>
-    <view class="arrow-btn">→</view>
-  </view>
 
-  <view class="row">
-    <view class="feature-card sub-card" bindtap="goHistory">
-      <text class="sub-icon">📂</text>
-      <text class="sub-title">诊断记录</text>
+    <view class="grid-menu">
+      
+      <view class="grid-item vip-item" bindtap="toUser">
+        <text class="grid-icon">👑</text>
+        <text class="grid-label">会员中心</text>
+      </view>
+
+      <view class="grid-item" bindtap="toHistory">
+        <text class="grid-icon">📂</text>
+        <text class="grid-label">诊断记录</text>
+      </view>
+
+      <view class="grid-item" bindtap="toExpert">
+        <text class="grid-icon">👨‍⚕️</text>
+        <text class="grid-label">联系专家</text>
+      </view>
     </view>
-    <view class="feature-card sub-card" bindtap="goStart">
-      <text class="sub-icon">👨‍⚕️</text>
-      <text class="sub-title">联系专家</text>
-    </view>
   </view>
-</view>
 
-<view class="footer-stats">
-  <view class="stat-item">
-    <text class="stat-num">2000+</text>
-    <text class="stat-label">病害图谱</text>
-  </view>
-  <view class="stat-divider"></view>
-  <view class="stat-item">
-    <text class="stat-num">98%</text>
-    <text class="stat-label">识别准确率</text>
-  </view>
-</view>
-
+  <view class="footer">作物AI诊所 · 您的掌上植保专家</view>
 </view>

@@ -1,217 +1,85 @@
-/* miniprogram/pages/diagnosis/welcome/welcome.wxss */
 page {
-  background: var(--primary-color); /* 此时这里应该是深绿色 */
+  background-color: #1d8235; /* 保持您的绿色背景 */
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, sans-serif;
+  height: 100%;
   overflow: hidden;
 }
 
-.welcome-page {
-  position: relative;
-  min-height: 100vh;
-  padding: 120rpx 40rpx 60rpx;
+.container {
+  padding: 60rpx 40rpx;
+  height: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  z-index: 1;
+  justify-content: space-between;
 }
 
-/* --- 装饰背景圆环 --- */
-.decorative-circle {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
-  z-index: 0;
-  pointer-events: none;
+/* 顶部文案 */
+.header { margin-top: 40rpx; }
+.tag {
+  background: rgba(255,255,255,0.2);
+  padding: 6rpx 20rpx; border-radius: 30rpx;
+  font-size: 24rpx; display: inline-block; margin-bottom: 20rpx;
 }
-.c1 { width: 600rpx; height: 600rpx; top: -100rpx; right: -100rpx; }
-.c2 { width: 400rpx; height: 400rpx; bottom: 100rpx; left: -100rpx; opacity: 0.6; }
+.title { font-size: 64rpx; font-weight: bold; line-height: 1.2; display: block; margin-bottom: 20rpx; }
+.subtitle { font-size: 28rpx; opacity: 0.8; line-height: 1.5; display: block; max-width: 600rpx; }
 
-/* --- 1. 头部品牌区 --- */
-.hero-section {
-  position: relative;
-  z-index: 2;
-  margin-bottom: 80rpx;
-}
+/* 核心操作区 */
+.main-action-area { width: 100%; }
 
-.brand-pill {
-  display: inline-flex;
-  align-items: center;
-  background: rgba(255,255,255,0.15);
-  border: 1rpx solid rgba(255,255,255,0.2);
-  padding: 8rpx 20rpx;
-  border-radius: 30rpx;
-  font-size: 22rpx;
-  color: #a7f3d0;
-  font-weight: 500;
-  margin-bottom: 30rpx;
-  backdrop-filter: blur(10px);
-}
-
-.brand-pill .dot {
-  width: 12rpx;
-  height: 12rpx;
-  background: #4ade80;
-  border-radius: 50%;
-  margin-right: 12rpx;
-  box-shadow: 0 0 10rpx #4ade80;
-}
-
-.hero-title {
-  display: flex;
-  flex-direction: column;
-}
-
-.line1 {
-  font-size: 64rpx;
-  font-weight: 800;
-  color: #ffffff;
-  letter-spacing: 2rpx;
-  line-height: 1.1;
-}
-
-.line2 {
-  font-size: 64rpx;
-  font-weight: 300;
-  color: #dcfce7;
-  letter-spacing: 2rpx;
-  margin-bottom: 24rpx;
-}
-
-.hero-desc {
-  font-size: 28rpx;
-  color: rgba(255,255,255,0.8);
-  line-height: 1.6;
-  max-width: 90%;
-}
-
-/* --- 2. 卡片容器 --- */
-.cards-container {
-  position: relative;
-  z-index: 2;
-  flex: 1;
-}
-
-.feature-card {
-  background: #ffffff;
-  border-radius: 32rpx;
-  box-shadow: 0 20rpx 40rpx rgba(0,0,0,0.2);
+/* 开始诊断大卡片 */
+.start-card {
+  background: #fff; border-radius: 30rpx;
+  padding: 40rpx; display: flex; align-items: center;
+  color: #333; margin-bottom: 30rpx;
+  box-shadow: 0 20rpx 40rpx rgba(0,0,0,0.1);
   transition: transform 0.1s;
 }
+.start-card:active { transform: scale(0.98); }
 
-.feature-card:active {
-  transform: scale(0.98);
+.icon-circle {
+  width: 100rpx; height: 100rpx; border-radius: 50%;
+  background: #e8f5e9; display: flex; align-items: center; justify-content: center;
+  margin-right: 30rpx; position: relative;
 }
+.icon-emoji { font-size: 50rpx; }
+.main-icon { width: 60%; height: 60%; position: absolute; opacity: 0; } /* 备用 */
 
-/* 主卡片：开始诊断 */
-.main-card {
-  padding: 40rpx;
-  display: flex;
-  align-items: center;
-  margin-bottom: 30rpx;
-  height: 140rpx;
-}
-
-.card-icon-box {
-  width: 100rpx;
-  height: 100rpx;
-  background: var(--accent-color);
-  border-radius: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48rpx;
-  margin-right: 30rpx;
-}
-
-.card-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.card-title {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin-bottom: 8rpx;
-}
-
-.card-sub {
-  font-size: 24rpx;
-  color: #666;
-}
+.text-group { flex: 1; }
+.card-title { font-size: 40rpx; font-weight: bold; display: block; margin-bottom: 8rpx; }
+.card-desc { font-size: 24rpx; color: #666; }
 
 .arrow-btn {
-  width: 70rpx;
-  height: 70rpx;
-  background: var(--primary-color);
-  border-radius: 50%;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  box-shadow: 0 8rpx 20rpx rgba(22, 101, 52, 0.4);
+  width: 60rpx; height: 60rpx; border-radius: 50%;
+  background: #1d8235; color: #fff; display: flex;
+  align-items: center; justify-content: center; font-weight: bold;
 }
 
-/* 副卡片行 */
-.row {
+/* 底部三列菜单 */
+.grid-menu {
   display: flex;
-  gap: 30rpx;
+  justify-content: space-between;
 }
 
-.sub-card {
-  flex: 1;
-  padding: 30rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 160rpx;
-  background: rgba(255,255,255,0.1); /* 半透明 */
-  border: 1rpx solid rgba(255,255,255,0.2);
+.grid-item {
+  background: rgba(255,255,255,0.15);
+  border-radius: 24rpx;
+  width: 31%; /* 三等分 */
+  padding: 30rpx 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
   backdrop-filter: blur(10px);
 }
+.grid-item:active { background: rgba(255,255,255,0.25); }
 
-.sub-card .sub-icon {
-  font-size: 48rpx;
-  margin-bottom: 16rpx;
+/* 会员中心特殊样式 */
+.vip-item {
+  background: linear-gradient(135deg, rgba(255,237,201,0.2), rgba(255,237,201,0.1));
+  border: 1rpx solid rgba(255,237,201,0.3);
 }
+.vip-item .grid-label { color: #ffedc9; font-weight: bold; }
 
-.sub-card .sub-title {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #ffffff;
-}
+.grid-icon { font-size: 48rpx; margin-bottom: 16rpx; }
+.grid-label { font-size: 26rpx; color: #fff; }
 
-/* --- 3. 底部数据 --- */
-.footer-stats {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: auto;
-  opacity: 0.8;
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0 40rpx;
-}
-
-.stat-num {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.stat-label {
-  font-size: 22rpx;
-  color: #a7f3d0;
-  margin-top: 4rpx;
-}
-
-.stat-divider {
-  width: 2rpx;
-  height: 40rpx;
-  background: rgba(255,255,255,0.3);
-}
+.footer { text-align: center; font-size: 22rpx; opacity: 0.6; margin-bottom: 20rpx; }
