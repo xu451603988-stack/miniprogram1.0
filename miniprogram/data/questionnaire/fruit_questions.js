@@ -1,44 +1,77 @@
-// miniprogram/data/questionnaire/fruit_questions.js
-// 国际标准果实诊断问卷 V5.0
-// 对应算法特征：THRIPS, SUNBURN, MELANOSE, CANKER, FRUIT_FLY, HLB_FRUIT
+/**
+ * miniprogram/data/questionnaire/fruit_questions.js
+ * 果实诊断题库 - 适配权重融合算法 (对象结构版)
+ */
 
-module.exports = [
-  {
-    id: "fruit_appearance",
-    title: "【望诊-果面】果皮表面最明显的瑕疵是什么？（可多选）",
-    type: "multiple",
-    required: true,
-    options: [
-      { label: "火山口状开裂病斑（有黄晕，手摸粗糙）", value: "canker_spots" }, // 溃疡
-      { label: "密布黑褐色小硬点（像撒了沙子/泪痕）", value: "melanose_spots" }, // 砂皮
-      { label: "果蒂周围银白色/灰白色环状疤痕", value: "thrips_ring" }, // 蓟马
-      { label: "大块黄褐色干枯斑（主要在向阳面）", value: "sunburn_patch" }, // 日灼
-      { label: "果面有针头大小虫孔（或流胶/发臭）", value: "maggot_rot" }, // 实蝇
-      { label: "果面干净", value: "surface_clean" }
-    ]
-  },
-  {
-    id: "fruit_shape_color",
-    title: "【望诊-形色】果实的形状和转色情况？",
+module.exports = {
+  // 1. 核心入口节点 (ID必须是 start)
+  "start": {
+    id: "start",
+    title: "【果实整体】请观察果实，最明显的异常出现在哪里？",
     type: "single",
     required: true,
     options: [
-      { label: "红鼻子果（果蒂红、果顶青，转色颠倒）", value: "red_nose" }, // 黄龙病铁证
-      { label: "果实开裂（裂果）", value: "cracking" }, // 裂果
-      { label: "果皮特厚、粗糙，果实偏硬", value: "thick_skin" }, // 缺硼
-      { label: "果实偏小或畸形（歪瓜裂枣）", value: "deformed" }, // 缺锌/黄龙病
-      { label: "果形色泽正常", value: "normal" }
+      { label: "果皮表面有斑点或疤痕", value: "symptom_spots", next: "fruit_spots_detail" },
+      { label: "果实颜色不正常 (转色慢/不均)", value: "symptom_color", next: "fruit_color_detail" },
+      { label: "果实形状或大小异常", value: "symptom_shape", next: "fruit_shape_detail" },
+      { label: "果实腐烂或脱落", value: "symptom_rot", next: "fruit_rot_detail" }
     ]
   },
-  {
-    id: "drop_status",
-    title: "【问诊-落果】近期是否有落果现象？",
+
+  // 2. 斑点/疤痕 细分
+  "fruit_spots_detail": {
+    id: "fruit_spots_detail",
+    title: "【望诊-表皮】请仔细观察斑点的形态：",
     type: "single",
     required: true,
     options: [
-      { label: "大量落果（连带果柄/叶片一起落）", value: "drop_severe" }, // 严重胁迫
-      { label: "有落果（果柄处平滑脱落）", value: "drop_smooth" }, // 生理性/炭疽
-      { label: "基本不落果", value: "drop_none" }
+      { label: "火山状凸起的褐色病斑 (摸起来粗糙)", value: "canker_fruit", isEnd: true }, // 溃疡病
+      { label: "泪痕状或泥块状黑色附着物", value: "melanose_fruit", isEnd: true }, // 砂皮病
+      { label: "灰白色圈状/环状疤痕 (像眼镜框)", value: "thrips_scar", isEnd: true }, // 蓟马
+      { label: "凹陷的褐色腐烂斑", value: "anthracnose_fruit", isEnd: true }, // 炭疽病
+      { label: "其他不规则斑点", value: "unknown_spots", isEnd: true }
+    ]
+  },
+
+  // 3. 颜色异常 细分
+  "fruit_color_detail": {
+    id: "fruit_color_detail",
+    title: "【望诊-着色】颜色的具体异常表现是？",
+    type: "single",
+    required: true,
+    options: [
+      { label: "红鼻子果 (果蒂红，果身青)", value: "hlb_red_nose", isEnd: true }, // 黄龙病典型
+      { label: "向阳面出现黄白色灼伤斑", value: "sunburn_fruit", isEnd: true }, // 日灼
+      { label: "果实偏小且一直不转色 (青僵果)", value: "green_stiff_fruit", isEnd: true }, // 缺素或根系差
+      { label: "转色不均匀 (花斑果)", value: "color_uneven", isEnd: true }
+    ]
+  },
+
+  // 4. 形状/大小 细分
+  "fruit_shape_detail": {
+    id: "fruit_shape_detail",
+    title: "【望诊-形态】果实形状发生了什么变化？",
+    type: "single",
+    required: true,
+    options: [
+      { label: "果实开裂 (裂果)", value: "fruit_cracking", isEnd: true }, // 缺钙/水分剧变
+      { label: "果实畸形/歪斜", value: "deformed_fruit", isEnd: true }, // 缺硼/授粉不良
+      { label: "果皮异常增厚/浮皮", value: "thick_skin", isEnd: true }, // 氮肥过多
+      { label: "果实个头明显偏小", value: "small_fruit", isEnd: true }
+    ]
+  },
+
+  // 5. 腐烂/脱落 细分
+  "fruit_rot_detail": {
+    id: "fruit_rot_detail",
+    title: "【查体-落果】落果或腐烂时的特征？",
+    type: "single",
+    required: true,
+    options: [
+      { label: "蒂部褐色腐烂 (蒂腐)", value: "stem_end_rot", isEnd: true },
+      { label: "果实发霉 (青霉/绿霉)", value: "mold_rot", isEnd: true },
+      { label: "大量生理性落果 (无明显病斑)", value: "physiological_drop", isEnd: true },
+      { label: "虫蛀导致的落果 (有虫眼)", value: "insect_drop", isEnd: true }
     ]
   }
-];
+};
