@@ -2,17 +2,19 @@
   "pages": [
     "pages/welcome/welcome",
     "pages/index/index",
-    "pages/cropSelect/cropSelect",
-    "pages/positionSelect/positionSelect",
+    "pages/diagnosis/cropSelect/cropSelect",
+    "pages/diagnosis/positionSelect/positionSelect",
     "pages/diagnosis/question/question",
     "pages/diagnosis/result/result",
+    "pages/cropSelect/cropSelect",
+    "pages/positionSelect/positionSelect",
     "pages/user/user"
   ],
   "window": {
     "backgroundColor": "#F6F6F6",
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#F6F6F6",
-    "navigationBarTitleText": "作物AI诊所",
+    "navigationBarTitleText": "柑橘AI诊所",
     "navigationBarTextStyle": "black"
   },
   "sitemapLocation": "sitemap.json",
