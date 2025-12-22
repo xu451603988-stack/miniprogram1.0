@@ -3,13 +3,16 @@ const app = getApp();
 
 Page({
   data: {
-    userInfo: null,
+    // 给个默认头像，防止 user.js 报错找不到图片
+    userInfo: {
+      avatarUrl: '/images/icons/avatar.png', 
+      nickName: '未登录用户'
+    },
     isVip: false,
     inputCode: '',
-    // 使用 userStats 统一管理
     userStats: {
       diagnosisCount: 0,
-      remainingPoints: 0
+      remainingPoints: 0 // 默认显示0，加载后更新
     }
   },
 
@@ -21,34 +24,34 @@ Page({
     this.refreshUserStatus();
   },
 
-  // 核心：调用云函数获取最新数据 (绕过缓存)
+  // 核心：调用云函数获取最新数据
   async refreshUserStatus() {
-    console.log('🔄 正在刷新数据...');
+    console.log('🔄 正在同步用户数据...');
     try {
-      // 调用云函数里的查询接口，强制拿最新数据
       const res = await wx.cloud.callFunction({
         name: 'orchardFunctions',
         data: { type: 'getLatestUserInfo' }
       });
 
-      console.log('☁️ 云端返回:', res.result);
-
-      // 容错处理：确保拿到数据
-      if (res.result && res.result.data && res.result.data.length > 0) {
+      // 只要云函数返回 success: true
+      if (res.result && res.result.success && res.result.data.length > 0) {
         const stats = res.result.data[0];
         
+        // 更新全局变量
         app.globalData.userStats = stats;
         
         this.setData({
           isVip: stats.memberLevel > 0,
-          userStats: stats, 
-          userInfo: app.globalData.userInfo || null
+          userStats: stats,
+          // 如果全局有用户信息就用全局的，否则显示默认的
+          userInfo: app.globalData.userInfo || this.data.userInfo
         });
         
-        console.log(`✅ 刷新成功 | 积分: ${stats.remainingPoints}`);
+        console.log(`✅ 同步成功 | 剩余积分: ${stats.remainingPoints}`);
       }
     } catch (e) {
-      console.error("❌ 刷新失败:", e);
+      console.error("❌ 同步失败:", e);
+      wx.showToast({ title: '数据同步失败', icon: 'none' });
     } finally {
       wx.stopPullDownRefresh();
     }
@@ -61,36 +64,38 @@ Page({
   async submitRedeem() {
     const code = this.data.inputCode.trim();
     if (!code) {
-      wx.showToast({ title: '请输入激活码', icon: 'none' });
-      return;
+      return wx.showToast({ title: '请输入激活码', icon: 'none' });
     }
 
-    wx.showLoading({ title: '激活中...' });
+    wx.showLoading({ title: '验证中...' });
 
     try {
       const res = await wx.cloud.callFunction({
         name: 'orchardFunctions',
-        data: { type: 'redeemCode', data: { code: code } }
+        data: { 
+          type: 'redeemCode', 
+          data: { code: code } 
+        }
       });
 
       wx.hideLoading();
 
       if (res.result && res.result.success) {
-        // 【核心修复】这里不再读取 res.result.latestStats，避免报错！
-        // 直接弹窗提示成功，点击确定后刷新页面
-        
         wx.showModal({
           title: '激活成功',
-          content: '积分已到账，点击确定刷新数据。',
+          content: '积分已到账！',
           showCancel: false,
           success: () => {
             this.setData({ inputCode: '' });
-            // 强制刷新一次数据
-            this.refreshUserStatus();
+            this.refreshUserStatus(); // 重新拉取最新积分
           }
         });
       } else {
-        wx.showModal({ title: '激活失败', content: res.result.msg, showCancel: false });
+        wx.showModal({ 
+          title: '激活失败', 
+          content: res.result.msg || '激活码无效', 
+          showCancel: false 
+        });
       }
     } catch (err) {
       wx.hideLoading();
@@ -98,15 +103,18 @@ Page({
     }
   },
 
-  goOrchard() { wx.navigateTo({ url: '/pages/orchard/orchard' }); },
+  // 页面跳转逻辑
+  goOrchard() { wx.switchTab({ url: '/pages/orchard/orchard' }).catch(()=> wx.navigateTo({ url: '/pages/orchard/orchard' })); },
   goHistory() { wx.navigateTo({ url: '/pages/diagnosis/history/history' }); },
+  
   goMyPrescription() {
     if (!this.data.isVip) {
-      wx.showToast({ title: '请先激活会员', icon: 'none' });
+      wx.showToast({ title: '会员专享功能', icon: 'none' });
     } else {
-      wx.showToast({ title: '进入药方页面', icon: 'none' });
+      wx.showToast({ title: '药方功能开发中', icon: 'none' });
     }
   },
-  aboutUs() { wx.showToast({ title: '版本 2.6.0', icon: 'none' }); },
-  contactSupport() { wx.showToast({ title: '请联系客服', icon: 'none' }); }
+  
+  aboutUs() { wx.showModal({ title: '关于我们', content: '作物病虫害智能诊断系统 v2.6.0', showCancel: false }); },
+  contactSupport() { wx.showToast({ title: '请使用右上角反馈功能', icon: 'none' }); }
 });
