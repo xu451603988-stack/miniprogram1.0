@@ -1,39 +1,47 @@
-<view class="page-container">
-  <view class="icon-container">
-    <text class="crop-icon">🌱</text>
-  </view>
-
-  <view class="title-wrapper">
-    <text class="main-title">作物诊断小助手</text>
-    <text class="sub-title">中医四诊 · 科学辨病</text>
-  </view>
-
-  <view class="button-container">
-    <button 
-      class="diagnose-button" 
-      bindtap="goToForm"
-      hover-class="btn-hover"
-    >
-      <text>开始新诊断</text>
-      <text class="arrow-icon">→</text>
-    </button>
-  </view>
-
-  <view class="recent-card" wx:if="{{lastRecord}}" bindtap="viewRecord">
-    <view class="recent-header">
-      <text class="recent-label">最近诊断</text>
-      <text class="recent-time">{{lastRecord.time}}</text>
-    </view>
-    <view class="recent-content">
-      <view class="recent-info">
-        <text class="recent-title">{{lastRecord.summary}}</text>
-        <text class="recent-tags">{{lastRecord.systemBrief}}</text>
+<view class="container">
+  
+  <view class="header-card">
+    <view class="greeting">👋 早上好，园主</view>
+    <view class="orchard-info">
+      <view class="orchard-name">{{orchard.name}}</view>
+      <view class="tags">
+        <text class="tag">{{orchard.crop}}</text>
+        <text class="tag">{{orchard.treeAge}}年树 · {{orchard.stage}}</text>
       </view>
-      <view class="status-dot {{lastRecord.mainSeverityClass}}"></view>
+    </view>
+    <view class="weather-tip">🌤️ 今日天气适宜，建议巡园。</view>
+  </view>
+
+  <view class="action-area">
+    <view class="big-btn" bindtap="startDiagnosis">
+      <image src="/images/icons/search.png" class="btn-icon"></image>
+      <view class="btn-text">
+        <text class="main-text">智能诊断</text>
+        <text class="sub-text">拍照/问诊 识别病害</text>
+      </view>
     </view>
   </view>
 
-  <view class="footer">
-    <text class="footer-text">基于 V5.0 决策引擎 · 精准匹配调理方案</text>
+  <view class="section">
+    <view class="section-header">
+      <text class="title">最近记录</text>
+      <text class="more">查看全部 ></text>
+    </view>
+
+    <view class="history-list">
+      <block wx:for="{{historyList}}" wx:key="id">
+        <view class="history-item" bindtap="goHistoryDetail" data-id="{{item.id}}">
+          <view class="item-left">
+            <view class="item-date">{{item.date}}</view>
+          </view>
+          <view class="item-right">
+            <view class="item-result">{{item.result}}</view>
+            <view class="item-desc">{{item.desc}}</view>
+          </view>
+          <view class="arrow">></view>
+        </view>
+      </block>
+    </view>
   </view>
+
 </view>

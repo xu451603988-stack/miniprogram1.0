@@ -1,43 +1,71 @@
-<view class="page-container" wx:if="{{isInitialized}}">
+<view class="container" wx:if="{{!loading}}">
+  
+  <view class="card diagnosis-card">
+    <view class="card-header">
+      <text class="label">中医辨证结果</text>
+      <view class="confidence-tag">置信度 {{report.confidence}}%</view>
+    </view>
+    
+    <view class="syndrome-name">{{report.syndrome}}</view>
+    
+    <view class="constitution-tags">
+      <text class="tag">{{report.constitution.desc}}</text>
+    </view>
 
-<view class="nav-header">
-  <view class="back-btn" bindtap="goBack">
-    <text class="back-icon">‹</text> 
-    <text>上一步</text>
+    <view class="divider"></view>
+
+    <view class="section-title">🕵️‍♂️ 病机推演</view>
+    <view class="logic-text">
+      {{report.pathogenesis}}
+    </view>
   </view>
-  <view class="step-indicator">智能诊断中...</view>
-</view>
 
-<view class="question-card fade-in">
-  <view class="question-title-box">
-    <view class="q-icon">❓</view>
-    <text class="question-title">{{currentNode.title}}</text>
-  </view>
-
-  <view class="options-list">
-    <block wx:for="{{currentNode.options}}" wx:key="value">
-      <view 
-        class="option-item" 
-        hover-class="option-hover"
-        bindtap="onOptionClick"
-        data-item="{{item}}"
-      >
-        <view class="option-dot"></view>
-        
-        <text class="option-label">{{item.label}}</text>
-        
-        <text class="option-arrow">›</text>
+  <view class="card evils-card">
+    <view class="section-title">📊 五邪侵袭指数</view>
+    <view class="evils-list">
+      <block wx:for="{{evilsList}}" wx:key="key">
+        <view class="evil-item" wx:if="{{item.score > 0}}">
+          <view class="evil-label">{{item.label}}</view>
+          <view class="progress-bg">
+            <view class="progress-bar" style="width: {{item.percent}}%; background-color: {{item.color}}"></view>
+          </view>
+          <view class="evil-score">{{item.score}}</view>
+        </view>
+      </block>
+      <view class="tips" wx:if="{{evilsList.length === 0 || evilsList[0].score === 0}}">
+        🌿 当前环境气场平和，未见明显邪气。
       </view>
-    </block>
+    </view>
   </view>
+
+  <view class="card prescription-card">
+    <view class="section-title">💊 {{report.principleTitle || '系统调理方案'}}</view>
+    
+    <view class="steps-box">
+      <block wx:for="{{report.prescription}}" wx:key="index">
+        <view class="step-item">
+          <view class="step-icon">{{item.icon || (index + 1)}}</view>
+          <view class="step-content">
+            <view class="step-method">{{item.name}}</view>
+            <view class="step-action">{{item.desc}}</view>
+          </view>
+        </view>
+      </block>
+      
+      <view class="tips" wx:if="{{!report.prescription || report.prescription.length === 0}}">
+        暂无特定操作建议，建议加强田间管理。
+      </view>
+    </view>
+  </view>
+
+  <view class="footer-btns">
+    <button class="btn-retry" bindtap="onRetry">重新诊断</button>
+    <button class="btn-home" bindtap="onGoHome">返回首页</button>
+  </view>
+
 </view>
 
-<view class="footer-hint">
-  <text>基于《中药农业》系统辨证逻辑实时分析</text>
-</view>
-
-</view>
-
-<view wx:else class="loading-box">
-<text class="loading-text">正在加载诊断逻辑...</text>
+<view class="loading-box" wx:else>
+  <view class="loading-spinner"></view>
+  <text>系统辨证分析中...</text>
 </view>

@@ -1,152 +1,237 @@
 /* miniprogram/pages/diagnosis/question/question.wxss */
 
-/* 整体背景 */
+/* 全局容器 */
 .page-container {
-  min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #F5F7FA; /* 云雾白背景 */
   box-sizing: border-box;
-  padding: 30rpx 24rpx;
-  background: #f0f9f0; /* 浅绿护眼背景 */
-  display: flex;
-  flex-direction: column;
 }
 
-/* 顶部导航 */
-.nav-header {
+/* === 顶部区域 === */
+.header-section {
+  background: #fff;
+  padding: 30rpx 40rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.05);
+  z-index: 10;
+}
+
+.step-info {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 40rpx;
-  padding: 0 10rpx;
-  color: #555;
+  align-items: flex-end;
+  margin-bottom: 20rpx;
+}
+
+.step-num {
   font-size: 28rpx;
+  color: #4CAF50;
+  font-weight: bold;
+  background: rgba(76, 175, 80, 0.1);
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
 }
 
-.back-btn {
-  display: flex;
-  align-items: center;
-  padding: 10rpx 20rpx;
-  background: rgba(255,255,255,0.6);
-  border-radius: 30rpx;
-}
-
-.back-icon {
-  font-size: 36rpx;
-  margin-right: 6rpx;
-  margin-top: -4rpx; /* 微调对齐 */
-}
-
-/* 问题卡片 */
-.question-card {
-  background: white;
-  border-radius: 32rpx;
-  padding: 50rpx 40rpx;
-  box-shadow: 0 16rpx 40rpx rgba(45, 140, 45, 0.08);
-  margin-bottom: 40rpx;
-}
-
-.question-title-box {
-  display: flex;
-  align-items: flex-start;
-  margin-bottom: 60rpx;
-}
-
-.q-icon {
-  font-size: 36rpx;
-  margin-right: 20rpx;
-  margin-top: 4rpx;
-}
-
-.question-title {
-  font-size: 36rpx;
-  font-weight: 600;
+.step-name {
+  font-size: 34rpx;
   color: #333;
-  line-height: 1.5;
+  font-weight: 600;
 }
 
-/* 选项列表 */
-.options-list {
-  display: flex;
-  flex-direction: column;
-  gap: 24rpx;
+/* 进度条轨道 */
+.progress-track {
+  height: 8rpx;
+  background: #E0E0E0;
+  border-radius: 4rpx;
+  overflow: hidden;
 }
 
-.option-item {
-  position: relative;
-  background: #f8fcf8;
-  border: 2rpx solid #e2efe2;
-  border-radius: 20rpx;
-  padding: 32rpx 30rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: all 0.2s ease;
+/* 进度条本身 */
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #81C784, #4CAF50);
+  border-radius: 4rpx;
+  transition: width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-/* 点击态 */
-.option-hover {
-  background: #eefbee;
-  border-color: #2d8c2d;
-  transform: scale(0.98);
-}
-
-.option-dot {
-  width: 12rpx;
-  height: 12rpx;
-  background: #2d8c2d;
-  border-radius: 50%;
-  margin-right: 20rpx;
-  opacity: 0.6;
-}
-
-.option-label {
+/* === 内容滚动区 === */
+.content-scroll {
   flex: 1;
-  font-size: 30rpx;
-  color: #444;
-  font-weight: 500;
+  width: 100%;
 }
 
-.option-arrow {
-  color: #ccc;
-  font-size: 32rpx;
+.question-container {
+  padding: 30rpx;
 }
 
-/* 底部提示 */
-.footer-hint {
-  margin-top: auto;
-  text-align: center;
-  padding-bottom: 20rpx;
-}
-
-.footer-hint text {
-  font-size: 22rpx;
-  color: #999;
-  background: rgba(0,0,0,0.03);
-  padding: 8rpx 20rpx;
-  border-radius: 20rpx;
-}
-
-/* 动画效果 */
-.fade-in {
-  animation: fadeIn 0.4s ease-out;
+/* === 问题卡片 === */
+.question-card {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 30rpx;
+  margin-bottom: 30rpx;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.03);
+  /* 简单的淡入动画 */
+  animation: fadeIn 0.5s ease;
 }
 
 @keyframes fadeIn {
-  from { 
-    opacity: 0; 
-    transform: translateY(20rpx); 
-  }
-  to { 
-    opacity: 1; 
-    transform: translateY(0); 
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* 加载中 */
-.loading-box {
+.card-header {
   display: flex;
-  justify-content: center;
+  align-items: flex-start;
+  margin-bottom: 12rpx;
+}
+
+.tag-required {
+  background: #FF5252;
+  color: #fff;
+  font-size: 20rpx;
+  padding: 2rpx 8rpx;
+  border-radius: 6rpx;
+  margin-right: 12rpx;
+  margin-top: 6rpx;
+  flex-shrink: 0;
+}
+
+.question-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #2c3e50;
+  line-height: 1.4;
+}
+
+.question-desc {
+  font-size: 26rpx;
+  color: #909399;
+  margin-bottom: 30rpx;
+  margin-left: 56rpx; /* 对齐标题 */
+}
+
+/* === 选项组 === */
+.options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+/* 单个选项 */
+.option-item {
+  position: relative;
+  display: flex;
   align-items: center;
-  height: 100vh;
-  color: #999;
+  padding: 24rpx 30rpx;
+  background: #F9FAFC;
+  border: 2rpx solid transparent;
+  border-radius: 16rpx;
+  transition: all 0.3s ease;
+}
+
+/* 选项点击态 */
+.option-hover {
+  background: #f0f0f0;
+}
+
+/* 选中状态 */
+.option-item.active {
+  background: #E8F5E9; /* 浅绿背景 */
+  border-color: #4CAF50;
+  box-shadow: 0 4rpx 12rpx rgba(76, 175, 80, 0.15);
+}
+
+/* 模拟 Radio 圈圈 */
+.radio-box {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  border: 2rpx solid #C0C4CC;
+  margin-right: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #fff;
+}
+
+.option-item.active .radio-box {
+  border-color: #4CAF50;
+}
+
+.radio-core {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  background: #4CAF50;
+}
+
+.option-text {
   font-size: 28rpx;
+  color: #555;
+  flex: 1;
+}
+
+.option-item.active .option-text {
+  color: #2E7D32;
+  font-weight: 500;
+}
+
+/* === 底部按钮区 === */
+.bottom-spacer {
+  height: 120rpx; /* 留出底部空间 */
+}
+
+.footer-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #fff;
+  padding: 20rpx 40rpx calc(20rpx + env(safe-area-inset-bottom));
+  box-shadow: 0 -4rpx 20rpx rgba(0, 0, 0, 0.05);
+  z-index: 100;
+}
+
+.btn-wrapper {
+  display: flex;
+  justify-content: space-between;
+  gap: 30rpx;
+}
+
+button {
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  font-weight: bold;
+  border: none;
+  line-height: 88rpx;
+  margin: 0;
+}
+
+button::after {
+  border: none;
+}
+
+.btn-prev {
+  width: 30% !important;
+  background: #F0F2F5;
+  color: #606266;
+}
+
+.btn-next {
+  width: 65% !important;
+  background: linear-gradient(135deg, #66BB6A, #4CAF50);
+  color: #fff;
+  box-shadow: 0 6rpx 16rpx rgba(76, 175, 80, 0.3);
+}
+
+.btn-next.full-width {
+  width: 100% !important;
+}
+
+.btn-hover {
+  opacity: 0.9;
+  transform: scale(0.98);
 }

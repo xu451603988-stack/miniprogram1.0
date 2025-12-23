@@ -1,24 +1,22 @@
-<view class="page-v5">
+<view class="page-v4" wx:if="{{resultType === 'decision_tree_v5' || report}}">
   
   <view class="result-card {{report.severity}}">
     <view class="card-header">
-      <view class="risk-badge">
-        <text class="risk-icon">⚠️</text>
+      <view class="risk-tag">
+        <text class="risk-icon">{{report.severity === 'mild' ? '🛡️' : '⚠️'}}</text>
         <text>{{report.severityLabel}}</text>
       </view>
-      <text class="time-tag">刚刚</text>
+      <text class="date">{{report.time}}</text>
     </view>
     
-    <view class="main-title">{{report.title}}</view>
+    <view class="diagnosis-name">{{report.title}}</view>
     
-    <view class="tags-row">
-      <block wx:for="{{report.tags}}" wx:key="*this">
-        <text class="tag-item">{{item}}</text>
-      </block>
+    <view class="tags-row" wx:if="{{report.tags && report.tags.length > 0}}">
+      <text wx:for="{{report.tags}}" wx:key="*this" class="tag">{{item}}</text>
     </view>
 
-    <view class="risk-bar-box">
-      <text class="risk-label">风险指数</text>
+    <view class="risk-bar-container">
+      <view class="risk-bar-label">风险指数</view>
       <view class="risk-track">
         <view class="risk-fill" 
               style="width: {{report.severity === 'severe' ? '90%' : (report.severity === 'moderate' ? '60%' : '30%')}}">
@@ -27,44 +25,49 @@
     </view>
   </view>
 
-  <view class="section-card">
+  <view class="section-box">
     <view class="section-title">
-      <text class="sec-icon">🔍</text> 专家辨证
+      <text class="icon">🔍</text> 专家辨证
     </view>
-    <view class="logic-text">
+    <view class="logic-content">
       <text user-select="true">{{report.logic}}</text>
     </view>
   </view>
 
-  <view class="section-card">
+  <view class="section-box">
     <view class="section-title">
-      <text class="sec-icon">💊</text> 调理方案
+      <text class="icon">💊</text> 调理方案
     </view>
+    
     <view class="solution-list">
       <block wx:for="{{report.solutions}}" wx:key="index">
-        <view class="solution-item">
+        <view class="solution-item" hover-class="item-hover">
           <view class="sol-type {{item.type === '系统固本' ? 'root-type' : 'cure-type'}}">
             {{item.type || '建议'}}
           </view>
-          <view class="sol-content">
-            <text user-select="true">{{item.content}}</text>
-          </view>
+          <view class="sol-text" user-select="true">{{item.content}}</view>
         </view>
       </block>
-      <view wx:if="{{report.solutions.length === 0}}" class="empty-tip">
-        暂无特定药物建议，请参考系统调理方案。
+
+      <view wx:if="{{!report.solutions || report.solutions.length === 0}}" class="empty-tip">
+        <image class="empty-icon" src="/images/icon_leaf_gray.png" mode="aspectFit" wx:if="{{false}}"></image> <text>暂无特定药物建议，请参考系统调理方案。</text>
       </view>
     </view>
   </view>
 
-  <view class="footer-area">
-    <view class="btn-group">
-      <button class="btn-secondary" bindtap="goHome">返回首页</button>
-      <button class="btn-primary" bindtap="retest">重新诊断</button>
-    </view>
-    <view class="expert-link" bindtap="contactDoctor">
-      联系植保专家获取人工指导 >
-    </view>
+  <view class="footer-btn-group">
+    <button class="btn-secondary" hover-class="btn-hover" bindtap="goHome">返回首页</button>
+    <button class="btn-primary" hover-class="btn-hover" bindtap="retest">重新诊断</button>
   </view>
+ 
+  <button class="btn-text" hover-class="text-hover" bindtap="contactDoctor">联系植保专家</button>
 
+</view>
+
+<view wx:else class="page-legacy">
+  <view class="summary-card">
+    <icon type="info" size="40" color="#999"></icon>
+    <text class="legacy-text">数据格式不兼容，请重新测试。</text>
+  </view>
+  <button class="btn-primary" bindtap="retest" style="margin-top:40rpx;">重新测试</button>
 </view>

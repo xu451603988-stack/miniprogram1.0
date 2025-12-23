@@ -1,172 +1,138 @@
 // miniprogram/pages/diagnosis/question/question.js
-// 权重融合算法适配版 + 会员积分拦截逻辑
-
+const config = require('../../../utils/questionConfig.js');
 const app = getApp();
-
-// 引入问卷题目数据
-const leafQuestions = require('../../../data/questionnaire/leaf_questions.js');
-const fruitQuestions = require('../../../data/questionnaire/fruit_questions.js');
 
 Page({
   data: {
-    isInitialized: false,
-    currentNode: null,
-    historyStack: [],
-    crop: 'citrus',
-    module: 'leaf',
-    selectedSymptomKeys: {}, 
+    currentStepIndex: 0, // 当前步骤 (0: 根土, 1: 茎叶, 2: 环境)
+    stepTitle: "",       // 当前步骤标题
+    progress: 0,         // 进度条 (0-100)
+    currentQuestions: [],// 当前页面显示的题目列表
+    answers: {},         // 存放用户选择的答案 { root_smell: 'sour', ... }
+    isLastStep: false    // 是否是最后一步
   },
 
   onLoad(options) {
-    const crop = options.crop || app.globalData.currentCrop || 'citrus';
-    let positions = [];
-    if (options.positions) {
-      try { positions = JSON.parse(decodeURIComponent(options.positions)); } catch(e){}
-    }
-    
-    let moduleType = 'leaf';
-    if (positions.includes('fruit')) moduleType = 'fruit';
+    // 初始化第一步
+    this.initStep(0);
+  },
 
-    this.setData({ 
-      crop, 
-      module: moduleType,
-      isInitialized: false 
-    });
+  /**
+   * 初始化指定步骤的题目
+   */
+  initStep(index) {
+    const stepKey = `step${index + 1}`; // step1, step2, step3
+    const questions = config[stepKey];
+    const title = config.steps[index];
 
-    this.treeData = (moduleType === 'fruit') ? fruitQuestions : leafQuestions;
-
-    if (!this.treeData || !this.treeData['start']) {
-      wx.showModal({ 
-        title: '数据异常', 
-        content: '未能加载起始题目，请确认数据文件包含 start 节点', 
-        showCancel: false 
-      });
+    if (!questions) {
+      console.error("未找到步骤配置:", stepKey);
       return;
     }
 
-    this.loadNode('start');
-  },
+    // 计算进度
+    const progress = Math.round(((index + 1) / config.steps.length) * 100);
 
-  loadNode(nodeId) {
-    const node = this.treeData[nodeId];
-    if (!node) return;
     this.setData({
-      currentNode: node,
-      isInitialized: true 
+      currentStepIndex: index,
+      stepTitle: title,
+      currentQuestions: questions,
+      progress: progress,
+      isLastStep: index === config.steps.length - 1
     });
-  },
 
-  onOptionClick(e) {
-    const item = e.currentTarget.dataset.item;
-    if (!item) return;
-
-    const currentId = this.data.currentNode.id;
-
-    if (item.value) {
-      const newKeys = { ...this.data.selectedSymptomKeys };
-      newKeys[currentId] = item.value;
-      this.setData({ selectedSymptomKeys: newKeys });
-    }
-
-    if (item.isEnd) {
-      this.checkPermissionAndSubmit(); // 改为先检查权限
-    } else if (item.next) {
-      this.data.historyStack.push(currentId);
-      this.loadNode(item.next);
+    // 页面滚动回顶部
+    if (wx.pageScrollTo) {
+      wx.pageScrollTo({ scrollTop: 0 });
     }
   },
 
   /**
-   * 🛡️ 会员权限拦截器
+   * 用户点击选项
    */
-  async checkPermissionAndSubmit() {
-    const userStats = app.globalData.userStats;
+  selectOption(e) {
+    const { id, value } = e.currentTarget.dataset;
+    
+    // 1. 更新答案数据
+    const newAnswers = { ...this.data.answers, [id]: value };
+    
+    // 2. 更新视图选中状态 (为了让UI显示高亮)
+    this.setData({
+      answers: newAnswers
+    });
 
-    if (!userStats) {
-      wx.showToast({ title: '用户信息同步中...', icon: 'loading' });
-      return;
-    }
-
-    // 逻辑：非VIP 且 积分不足
-    if (userStats.memberLevel === 0 && userStats.remainingPoints <= 0) {
-      wx.showModal({
-        title: '诊断次数已耗尽',
-        content: '您的免费次数已用完，开通会员可享受无限次精准诊断。',
-        confirmText: '去查看',
-        success: (res) => {
-          if (res.confirm) wx.navigateTo({ url: '/pages/user/user' });
-        }
-      });
-      return;
-    }
-
-    // 权限通过，进入计算
-    this.submitWeightFusionDiagnosis();
+    // 可选：如果是单选题且当前步骤只有一个问题，可以自动跳下一题
+    // 但考虑到"中医诊断"需要慎重，建议让用户手动点"下一步"
   },
 
   /**
-   * 🚀 核心算法执行 + 积分扣除
+   * 点击"下一步"
    */
-  async submitWeightFusionDiagnosis() {
-    wx.showLoading({ title: '权重融合分析中...', mask: true });
+  onNext() {
+    // 1. 验证当前步骤是否已填完
+    if (!this.validateCurrentStep()) {
+      return;
+    }
 
-    const symptomKeys = Object.values(this.data.selectedSymptomKeys);
-    const env = {
-      continuousRain: app.globalData.climate?.rain > 50,
-      lowTemperature: app.globalData.climate?.temp < 12
-    };
-
-    try {
-      const engine = app.globalData.diagnosticEngine;
-      const scoringResult = engine.calculateFinalScores(symptomKeys, env, "all");
-
-      if (!scoringResult || scoringResult.length === 0) throw new Error("算法结论为空");
-
-      const topRisk = scoringResult[0];
-      const finalResult = {
-        diagnosis: topRisk.target,
-        score: topRisk.score,
-        confidence: Math.min(Math.round(topRisk.score * 5), 99),
-        allScores: scoringResult,
-        type: "weight_fusion_v4",
-        timestamp: new Date().getTime()
-      };
-
-      // --- 关键：诊断成功后扣除积分 (仅限普通用户) ---
-      if (app.globalData.userStats.memberLevel === 0) {
-        const db = wx.cloud.database();
-        await db.collection('users').doc(app.globalData.userStats._id).update({
-          data: {
-            remainingPoints: db.command.inc(-1)
-          }
-        });
-        // 同步本地全局变量，防止页面不刷新
-        app.globalData.userStats.remainingPoints -= 1;
-        console.log('📉 积分扣除成功，剩余：', app.globalData.userStats.remainingPoints);
-      }
-
-      wx.setStorageSync('temp_diagnosis_result', finalResult);
-      
-      setTimeout(() => {
-        wx.hideLoading();
-        wx.redirectTo({ url: '/pages/diagnosis/result/result' });
-      }, 500);
-
-    } catch (err) {
-      wx.hideLoading();
-      wx.showModal({ title: '诊断失败', content: err.message, showCancel: false });
+    // 2. 进入下一步
+    if (!this.data.isLastStep) {
+      this.initStep(this.data.currentStepIndex + 1);
+    } else {
+      this.submitDiagnosis();
     }
   },
 
-  goBack() {
-    if (this.data.historyStack.length === 0) {
+  /**
+   * 点击"上一步"
+   */
+  onPrev() {
+    if (this.data.currentStepIndex > 0) {
+      this.initStep(this.data.currentStepIndex - 1);
+    } else {
       wx.navigateBack();
-      return;
     }
-    const prevId = this.data.historyStack.pop();
-    const newKeys = { ...this.data.selectedSymptomKeys };
-    delete newKeys[prevId];
-    this.setData({ selectedSymptomKeys: newKeys });
-    this.loadNode(prevId);
+  },
+
+  /**
+   * 验证逻辑：必填项检查
+   */
+  validateCurrentStep() {
+    const currentQ = this.data.currentQuestions;
+    const currentAns = this.data.answers;
+
+    for (let q of currentQ) {
+      if (!currentAns[q.id]) {
+        wx.showToast({
+          title: '请回答所有问题',
+          icon: 'none'
+        });
+        return false;
+      }
+    }
+    return true;
+  },
+
+  /**
+   * 提交诊断
+   */
+  submitDiagnosis() {
+    wx.showLoading({ title: '中医辨证中...' });
+
+    // 1. 将答案存入全局或本地存储，供 Result 页面读取
+    // 这里的 answers 包含了 root_smell, soil_texture 等核心数据
+    app.globalData.diagnosisAnswers = this.data.answers;
+    
+    // 为了防止数据丢失，也可以存一份到 Storage
+    wx.setStorageSync('last_diagnosis_answers', this.data.answers);
+
+    // 2. 模拟思考延迟 (提升用户体验)
+    setTimeout(() => {
+      wx.hideLoading();
+      
+      // 3. 跳转结果页
+      wx.reLaunch({
+        url: '/pages/diagnosis/result/result'
+      });
+    }, 1000);
   }
 });
