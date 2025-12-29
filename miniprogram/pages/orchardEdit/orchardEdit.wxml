@@ -1,0 +1,43 @@
+<view class="page">
+  <view class="header">
+    <view class="title">{{mode==='edit'?'编辑果园':'新增果园'}}</view>
+    <view class="subtitle">信息越完整，诊断越精准；不想填也可以留空</view>
+  </view>
+
+  <view class="card">
+    <view class="row">
+      <view class="label">名称</view>
+      <input class="input" placeholder="例如：1号果园" value="{{form.name}}" data-key="name" bindinput="onInput"/>
+    </view>
+
+    <view class="row">
+      <view class="label">地区</view>
+      <input class="input" placeholder="例如：广西" value="{{form.region}}" data-key="region" bindinput="onInput"/>
+    </view>
+
+    <view class="row">
+      <view class="label">树龄（年）</view>
+      <input class="input" type="number" placeholder="例如：5" value="{{form.age}}" data-key="age" bindinput="onInput"/>
+    </view>
+
+    <view class="row">
+      <view class="label">品种</view>
+      <input class="input" placeholder="例如：沃柑/椪柑/脐橙" value="{{form.variety}}" data-key="variety" bindinput="onInput"/>
+    </view>
+
+    <view class="row">
+      <view class="label">面积（亩）</view>
+      <input class="input" type="number" placeholder="例如：10" value="{{form.areaMu}}" data-key="areaMu" bindinput="onInput"/>
+    </view>
+
+    <view class="row col">
+      <view class="label">管理习惯</view>
+      <textarea class="textarea" placeholder="例如：滴灌/水肥一体；雨季易积水；常见红蜘蛛；近期是否猛促/重药等"
+        value="{{form.management}}" data-key="management" bindinput="onInput"/>
+    </view>
+  </view>
+
+  <view class="footer">
+    <button class="btn" type="primary" bindtap="onSave">保存</button>
+  </view>
+</view>

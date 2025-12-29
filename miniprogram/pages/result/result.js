@@ -1,149 +1,240 @@
-// miniprogram/pages/diagnosis/result/result.js
+// miniprogram/pages/result/result.js
+// --------------------------------------------------
+// Assembly 直出结构渲染版（支持从 history_selected_pkg 进入）
+// - 关键：所有 require 都显式指向 .js / index.js，避免被解析成 xxx.js 不存在
+// --------------------------------------------------
+
 const app = getApp();
+
+// ✅ 显式 .js
+const orchestrator = require('../../domain/orchestrator/diagnosisEngine.js');
+
+// ✅ 显式 index.js（避免被解析成 assembly.js）
+const AssemblyMod = require('../../domain/assembly/index.js');
+// 兼容：assembly 可能导出 {assemble} 或直接导出函数
+const assemble = (AssemblyMod && typeof AssemblyMod.assemble === 'function')
+  ? AssemblyMod.assemble
+  : AssemblyMod;
+
+// ✅ 显式 index.js（你现在报错就是这里）
+const solutions = require('../../domain/solutions/index.js');
+
+// ✅ 显式 .js
+const expertDictionary = require('../../domain/dictionary/expertDictionary.js');
+const treatmentPlans = require('../../domain/dictionary/treatmentPlans.js');
+
+function nowISO() {
+  try { return new Date().toISOString(); } catch (e) { return String(Date.now()); }
+}
+
+function safeParseJSON(str) {
+  try { return JSON.parse(str); } catch (e) { return null; }
+}
+
+function appendHistory(compactPkg) {
+  try {
+    const key = 'diagnosis_history';
+    const arr = wx.getStorageSync(key) || [];
+    const next = Array.isArray(arr) ? arr.slice() : [];
+
+    const item = {
+      traceId: compactPkg?.meta?.generatedAt || nowISO(),
+      date: compactPkg?.meta?.generatedAt || nowISO(),
+      summary: compactPkg?.summary?.headline || '诊断结果',
+      pkg: compactPkg
+    };
+
+    next.unshift(item);
+    wx.setStorageSync(key, next.slice(0, 50));
+  } catch (e) {}
+}
+
+function makeCompactPkg(fullPkg) {
+  if (!fullPkg) return null;
+  return {
+    meta: fullPkg.meta,
+    summary: fullPkg.summary,
+    primarySection: fullPkg.primarySection,
+    riskSection: fullPkg.riskSection,
+    alternativesSection: fullPkg.alternativesSection,
+    nextSteps: fullPkg.nextSteps
+  };
+}
+
+function reorderCandidatesToTop(report, pickedCode) {
+  if (!report || !pickedCode) return report;
+
+  const next = Object.assign({}, report);
+  const cands = Array.isArray(next.candidates) ? next.candidates.slice() : [];
+  const idx = cands.findIndex(x => x && x.code === pickedCode);
+  if (idx <= 0) {
+    next.code = pickedCode;
+    return next;
+  }
+
+  const picked = cands.splice(idx, 1)[0];
+  cands.unshift(picked);
+
+  next.code = pickedCode;
+  next.candidates = cands;
+  return next;
+}
 
 Page({
   data: {
-    resultData: null,       // 完整结果数据（来自 question 页 encode）
-    isCombined: false,      // 是否组合模式
-    finalCode: "",
-    summary: "",
-    details: [],
-    suggestions: [],
+    pkg: null,
 
-    leaf: null,
-    fruit: null,
-    root: null,
+    meta: null,
+    summary: null,
+    primarySection: null,
+    riskSection: null,
+    alternativesSection: null,
+    nextSteps: null,
 
-    rootSkipped: false
+    showRisk: false,
+    showAlts: false,
+    showFollowups: false,
+
+    answers: {},
+    lastReport: null
   },
 
   onLoad(options) {
-    console.log("【ResultPage】options:", options);
+    // ✅ 1) history 新入口：从 storage 读选中 pkg（不拼 query）
+    if (options?.from === 'history') {
+      const stored = wx.getStorageSync('history_selected_pkg');
+      if (stored && stored.primarySection) {
+        try { wx.removeStorageSync('history_selected_pkg'); } catch (e) {}
+        this.applyPackage(stored);
+        return;
+      }
+    }
 
-    if (!options.result) {
-      wx.showModal({
-        title: "数据错误",
-        content: "未接收到诊断结果。",
-        showCancel: false
-      });
+    // 兼容旧：如果 options.pkg（之前可能用过）
+    if (options?.pkg) {
+      const parsed = safeParseJSON(decodeURIComponent(options.pkg));
+      if (parsed) {
+        this.applyPackage(parsed);
+        return;
+      }
+    }
+
+    // 兼容旧：?result=
+    if (options?.result) {
+      const parsed = safeParseJSON(decodeURIComponent(options.result));
+      const pkg = parsed?.primarySection ? parsed : (parsed?.pkg?.primarySection ? parsed.pkg : null);
+      if (pkg) {
+        this.applyPackage(pkg);
+        return;
+      }
+    }
+
+    // ✅ 2) 主链路：answers -> orchestrator -> assembly
+    const answers =
+      app.globalData.diagnosisAnswers ||
+      wx.getStorageSync('last_diagnosis_answers') ||
+      {};
+
+    if (!answers || Object.keys(answers).length === 0) {
+      wx.showToast({ title: '未找到问卷答案', icon: 'none' });
       return;
     }
 
-    let parsed = {};
+    let report;
     try {
-      parsed = JSON.parse(decodeURIComponent(options.result));
-    } catch (err) {
-      console.error("结果解析失败:", err);
-      wx.showModal({
-        title: "解析失败",
-        content: "无法读取诊断结果。",
-        showCancel: false
-      });
-      return;
-    }
-
-    console.log("【ResultPage】parsed:", parsed);
-
-    // 判断是否组合模式
-    const isCombined = parsed.type === "combined";
-
-    this.setData(
-      {
-        resultData: parsed,
-        isCombined
-      },
-      () => {
-        if (isCombined) this.processCombined(parsed);
-        else this.processSingle(parsed);
-      }
-    );
-  },
-
-  /* ---------------------------------------
-   * 单模块结果处理
-   * parsed = {
-   *   module: "leaf",
-   *   crop,
-   *   month,
-   *   answers: {},
-   *   finalCode: "xxx"
-   * }
-   * --------------------------------------- */
-  processSingle(parsed) {
-    const engine = app.globalData && app.globalData.diagnosticEngine;
-    let res = {};
-
-    try {
-      if (engine && typeof engine.renderResult === "function") {
-        res = engine.renderResult(parsed.finalCode);
-      } else {
-        res = {
-          summary: "未获取到分析结果。",
-          details: [],
-          suggestions: []
-        };
-      }
+      report = orchestrator.run(answers);
     } catch (e) {
-      res = {
-        summary: "诊断渲染失败。",
-        details: [],
-        suggestions: []
-      };
+      wx.showToast({ title: '诊断失败（引擎异常）', icon: 'none' });
+      report = { code: '', candidates: [], riskTags: [], evidence: [], meta: { error: String(e?.message || e) } };
     }
 
-    this.setData({
-      finalCode: parsed.finalCode || "",
-      summary: res.summary || "暂无总结",
-      details: res.details || [],
-      suggestions: res.suggestions || []
+    try {
+      wx.setStorageSync('last_raw_diagnosis_report', report);
+      wx.setStorageSync('last_diagnosis_answers', answers);
+    } catch (e) {}
+
+    // ✅ 用 assemble 函数（兼容两种导出）
+    const fullPkg = assemble(answers, report, {
+      solutions,
+      expertDictionary,
+      treatmentPlans
     });
+
+    const compact = makeCompactPkg(fullPkg);
+
+    appendHistory(compact);
+    try { wx.setStorageSync('last_assembly_package', compact); } catch (e) {}
+
+    this.setData({ answers, lastReport: report });
+    this.applyPackage(compact);
   },
 
-  /* ---------------------------------------
-   * 组合模式结果结构：
-   * parsed = {
-   *   type: "combined",
-   *   payload: {
-   *     crop, month,
-   *     positions: ["leaf","fruit"],
-   *     answers: { leaf:{}, fruit:{}, root:{} },
-   *     rootQuick: "healthy" | null
-   *   },
-   *   result: {
-   *     leaf: {...},
-   *     fruit: {...},
-   *     root: {...},
-   *     summary: "...",
-   *     suggestions: [...]
-   *   }
-   * }
-   * --------------------------------------- */
-  processCombined(parsed) {
-    const r = parsed.result || {};
-    const payload = parsed.payload || {};
+  applyPackage(pkg) {
+    if (!pkg) return;
+
+    const riskDefaultCollapsed = !!pkg?.riskSection?.defaultCollapsed;
+    const altDefaultCollapsed = !!pkg?.alternativesSection?.defaultCollapsed;
 
     this.setData({
-      leaf: r.leaf || null,
-      fruit: r.fruit || null,
-      root: r.root || null,
-      summary: r.summary || "暂无总结",
-      suggestions: r.suggestions || [],
-      rootSkipped: payload.rootQuick === "healthy"
+      pkg,
+
+      meta: pkg.meta || null,
+      summary: pkg.summary || null,
+      primarySection: pkg.primarySection || null,
+      riskSection: pkg.riskSection || null,
+      alternativesSection: pkg.alternativesSection || null,
+      nextSteps: pkg.nextSteps || null,
+
+      showRisk: !riskDefaultCollapsed,
+      showAlts: !altDefaultCollapsed,
+      showFollowups: false
     });
   },
 
-  /* ---------------------------------------
-   * 页面交互：回首页 / 重新测试
-   * --------------------------------------- */
-  goHome() {
-    wx.reLaunch({
-      url: "/pages/index/index"
-    });
+  toggleRisk() {
+    this.setData({ showRisk: !this.data.showRisk });
   },
 
-  retest() {
-    wx.navigateBack({
-      delta: 2
+  toggleAlts() {
+    this.setData({ showAlts: !this.data.showAlts });
+  },
+
+  toggleFollowups() {
+    this.setData({ showFollowups: !this.data.showFollowups });
+  },
+
+  onPickAlternative(e) {
+    const code = e?.currentTarget?.dataset?.code;
+    if (!code) return;
+
+    const answers = this.data.answers || wx.getStorageSync('last_diagnosis_answers') || {};
+    const lastReport = this.data.lastReport || wx.getStorageSync('last_raw_diagnosis_report');
+
+    if (!lastReport) {
+      wx.showToast({ title: '缺少原始诊断结果，无法切换', icon: 'none' });
+      return;
+    }
+
+    const nextReport = reorderCandidatesToTop(lastReport, code);
+
+    const fullPkg = assemble(answers, nextReport, {
+      solutions,
+      expertDictionary,
+      treatmentPlans
     });
+
+    const compact = makeCompactPkg(fullPkg);
+
+    // 切换只是查看，不写历史
+    this.setData({ lastReport: nextReport });
+    this.applyPackage(compact);
+  },
+
+  goHistory() {
+    wx.navigateTo({ url: '/pages/history/history' });
+  },
+
+  goExpert() {
+    wx.navigateTo({ url: '/pages/expert/expert' });
   }
 });

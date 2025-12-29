@@ -2,21 +2,27 @@
   "pages": [
     "pages/welcome/welcome",
     "pages/index/index",
-    "pages/diagnosis/cropSelect/cropSelect",
-    "pages/diagnosis/positionSelect/positionSelect",
-    "pages/diagnosis/question/question",
-    "pages/diagnosis/result/result",
+
     "pages/cropSelect/cropSelect",
+    "pages/orchardManage/orchardManage",
+    "pages/orchardEdit/orchardEdit",
+    "pages/orchard/orchard",
+
+    "pages/question/question",
     "pages/positionSelect/positionSelect",
+    "pages/result/result",
+
+    "pages/history/history",
+    "pages/expert/expert",
     "pages/user/user"
   ],
   "window": {
-    "backgroundColor": "#F6F6F6",
-    "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#F6F6F6",
-    "navigationBarTitleText": "柑橘AI诊所",
-    "navigationBarTextStyle": "black"
+    "navigationBarTitleText": "作物健康智能诊断助手",
+    "navigationBarBackgroundColor": "#1f7a3b",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f5f6f7",
+    "backgroundTextStyle": "light"
   },
-  "sitemapLocation": "sitemap.json",
-  "style": "v2"
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
 }

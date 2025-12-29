@@ -1,0 +1,46 @@
+<view class="page">
+
+<view class="header">
+  <view class="title">果园管理</view>
+  <view class="subtitle">新增/编辑果园档案，并可设置默认果园</view>
+</view>
+
+<view class="card" wx:if="{{orchards.length === 0}}">
+  <view class="muted">暂无果园档案，建议先新增一个。</view>
+</view>
+
+<view class="list" wx:else>
+  <block wx:for="{{orchards}}" wx:key="id">
+    <view class="item">
+      <view class="item-head">
+        <view class="name">{{item.name}}</view>
+        <view class="badge {{activeId===item.id?'on':''}}">
+          {{activeId===item.id ? '默认' : '非默认'}}
+        </view>
+      </view>
+
+      <view class="meta">
+        <text class="meta-item">地区：{{item.region || 'unknown'}}</text>
+        <text class="meta-item">树龄：{{item.age || 5}}年</text>
+        <text class="meta-item">品种：{{item.variety || '-'}}</text>
+        <text class="meta-item">面积：{{item.areaMu || 0}}亩</text>
+      </view>
+
+      <view class="desc" wx:if="{{item.management}}">
+        管理习惯：{{item.management}}
+      </view>
+
+      <view class="actions">
+        <button class="btn ghost" data-id="{{item.id}}" bindtap="onEdit">编辑</button>
+        <button class="btn ghost" data-id="{{item.id}}" bindtap="onSetDefault">设为默认</button>
+        <button class="btn danger" data-id="{{item.id}}" bindtap="onDelete">删除</button>
+      </view>
+    </view>
+  </block>
+</view>
+
+<view class="footer">
+  <button class="btn" type="primary" bindtap="onAdd">新增果园</button>
+</view>
+
+</view>

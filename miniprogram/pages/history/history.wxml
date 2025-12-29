@@ -1,0 +1,50 @@
+<view class="page">
+
+<view class="card header-card">
+  <view class="header">
+    <view class="h-title">历史记录</view>
+    <view class="h-sub" wx:if="{{!empty}}">共 {{list.length}} 条</view>
+  </view>
+
+  <view class="actions">
+    <button class="btn ghost" bindtap="onClearAll" wx:if="{{!empty}}">清空</button>
+  </view>
+</view>
+
+<view wx:if="{{empty}}" class="card">
+  <view class="muted">暂无历史记录。去做一次诊断后，这里会自动保存。</view>
+</view>
+
+<view wx:else class="list">
+  <view class="card item"
+    wx:for="{{list}}"
+    wx:key="traceId"
+    data-idx="{{index}}"
+    bindtap="onTapItem"
+  >
+    <view class="row">
+      <view class="title">{{item.summary}}</view>
+      <view class="badge">{{item.confidenceLevel}}</view>
+    </view>
+
+    <view class="row sub">
+      <view class="muted">{{item.dateText}}</view>
+    </view>
+
+    <view class="flags" wx:if="{{item.qualityFlags && item.qualityFlags.length}}">
+      <view class="chip" wx:for="{{item.qualityFlags}}" wx:key="index">{{item}}</view>
+    </view>
+
+    <view class="row footer">
+      <view class="muted">点击查看详情</view>
+      <view class="del"
+        catchtap="onDeleteOne"
+        data-idx="{{index}}"
+      >
+        删除
+      </view>
+    </view>
+  </view>
+</view>
+
+</view>

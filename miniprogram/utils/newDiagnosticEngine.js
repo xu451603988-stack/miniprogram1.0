@@ -1,22 +1,29 @@
 // miniprogram/utils/newDiagnosticEngine.js
 /**
- * 作物健康诊断 · 时空记忆引擎 V4.0
- * 核心升级：
- * 1. 历史追溯 (Memory): 基于历史记录修正当前概率（惯性原则）
- * 2. 未来预警 (Prognosis): 基于当前诊断 + 下月物候预测次生灾害
+ * 作物健康诊断 · 全息感知引擎 V5.0
+ * * 核心升级：
+ * 1. 历史追溯 (Memory): 继承 V4.0，基于历史修正惯性。
+ * 2. 环境感知 (Sense): 【新增】融合实时天气（雨/温）动态加权。
+ * 3. 逻辑互斥 (Veto): 【新增】基于互斥条件降低误判率。
+ * 4. 未来预警 (Prognosis): 继承 V4.0。
  */
 
 const leafConfig = require('./newAlgorithm/leafConfig.js');
 const fruitConfig = require('./newAlgorithm/fruitConfig.js');
 const rootConfig = require('./newAlgorithm/rootConfig.js');
 
-// ---------------------- 1. 基础工具 ----------------------
+// ====================== 1. 基础工具 ======================
 
 function deepClone(obj) { return JSON.parse(JSON.stringify(obj || {})); }
 
+/**
+ * 计算置信度 (Sigmoid 变体)
+ * 分数越高，置信度越高，但在高分段平缓
+ */
 function calculateConfidence(score) {
   if (score <= 0) return 0;
-  const k = 0.25, x0 = 5;
+  // 调整参数：让低分更难达到高置信度，减少误报
+  const k = 0.2, x0 = 8; 
   const probability = 100 / (1 + Math.exp(-k * (score - x0)));
   return Math.min(Math.round(probability), 99);
 }
@@ -37,17 +44,18 @@ function mapCodeToName(code) {
     "fertilizer_burn": "肥害烧根", "soil_compaction": "土壤板结", "N": "缺氮", "Mg": "缺镁", 
     "Fe": "缺铁", "Zn": "缺锌", "fruit_fly": "果实蝇", "red_spider": "红蜘蛛", 
     "canker": "溃疡病", "anthracnose": "炭疽病", "hlb": "黄龙病", "sunburn": "日灼病",
-    "deficiency_Fe_Zn": "缺铁/缺锌", "deficiency_Mg": "缺镁"
+    "deficiency_Fe_Zn": "缺铁/缺锌", "deficiency_Mg": "缺镁", "drought": "干旱胁迫"
   };
   return map[code] || code;
 }
 
-// ---------------------- 2. 微观计算 ----------------------
+// ====================== 2. 核心权重计算 ======================
 
 function calculateMicroCauses(answers, config, phenologyKey) {
   if (!config || !config.features) return [];
   const scores = {}; 
   const evidenceChain = {}; 
+  const vetoFlags = []; // 互斥标记
 
   Object.keys(answers).forEach(qid => {
     let vals = answers[qid];
@@ -57,29 +65,48 @@ function calculateMicroCauses(answers, config, phenologyKey) {
     vals.forEach(opt => {
       const feat = config.features[opt];
       if (feat) {
+        // 1. 累加正向分数
         ['nutrition', 'pathogen', 'physio'].forEach(type => {
           if (feat[type]) {
             Object.keys(feat[type]).forEach(code => {
               const w = feat[type][code];
-              scores[code] = (scores[code] || 0) + w;
+              // 只有正分才计入证据链
               if (w > 0) {
+                scores[code] = (scores[code] || 0) + w;
                 if (!evidenceChain[code]) evidenceChain[code] = [];
                 evidenceChain[code].push(opt); 
+              } else if (w < 0) {
+                // 如果配置里有负分（排除项），直接减分
+                scores[code] = (scores[code] || 0) + w;
               }
             });
           }
         });
+
+        // 2. 【新增】互斥逻辑检查
+        // 假设配置文件里定义了 veto: ["root_rot_fungal"] 代表这个选项排除了根腐
+        if (feat.veto && Array.isArray(feat.veto)) {
+          feat.veto.forEach(vCode => vetoFlags.push(vCode));
+        }
       }
     });
   });
 
+  // 3. 物候修正 (Season Bias)
   if (phenologyKey && config.phenologyCorrections && config.phenologyCorrections[phenologyKey]) {
     const cor = config.phenologyCorrections[phenologyKey];
     Object.keys(scores).forEach(c => { if (cor[c] != null) scores[c] *= cor[c]; });
   }
 
   return Object.keys(scores).map(code => {
-    const score = scores[code];
+    let score = scores[code];
+
+    // 4. 【新增】执行互斥打击
+    // 如果收集到了排除这个病的标记，强制扣分
+    if (vetoFlags.includes(code)) {
+      score = score - 50; // 强力惩罚
+    }
+
     const isIronclad = (config.features && Object.values(config.features).some(f => 
       ['nutrition','pathogen','physio'].some(t => f[t] && f[t][code] >= 15)
     ));
@@ -87,171 +114,203 @@ function calculateMicroCauses(answers, config, phenologyKey) {
     return {
       code,
       name: mapCodeToName(code),
-      score,
+      score, // 此时 score 可能是负数
       confidence: isIronclad && score > 10 ? 99 : calculateConfidence(score),
       evidences: evidenceChain[code] || []
     };
   });
 }
 
-// ---------------------- 3. 协同推理 (V3.5) ----------------------
+// ====================== 3. 环境与协同逻辑 (V5.0) ======================
+
+/**
+ * 【新增】环境感知加权
+ * 将实时天气数据融入诊断
+ */
+function applyEnvironmentBias(mergedMap, envData) {
+  if (!envData) return [];
+  const log = [];
+
+  // envData 结构示例: { temp: 28, humidity: 80, rain: true }
+  
+  // 规则 1: 高温高湿/连续降雨 -> 爆发真菌病害
+  if (envData.rain || (envData.humidity > 85 && envData.temp > 25)) {
+    ["anthracnose", "canker", "root_rot_fungal"].forEach(code => {
+      if (mergedMap[code]) {
+        mergedMap[code].score *= 1.3; // 提分 30%
+        mergedMap[code].confidence = Math.min(99, mergedMap[code].confidence + 10);
+      }
+    });
+    if (envData.rain) log.push("近期降雨频繁，真菌类病害风险系数大幅上升。");
+  }
+
+  // 规则 2: 干旱/高温 -> 虫害活跃、日灼
+  if (!envData.rain && envData.temp > 32) {
+    ["red_spider", "fruit_fly", "sunburn"].forEach(code => {
+      if (mergedMap[code]) {
+        mergedMap[code].score *= 1.2;
+        mergedMap[code].confidence += 5;
+      }
+    });
+    log.push("高温干燥天气有利于虫害繁殖及日灼发生。");
+  }
+
+  return log;
+}
 
 function applySynergyRules(mergedMap, rootRisks) {
   const topRoot = rootRisks.sort((a,b) => b.score - a.score)[0];
   const isRootBad = topRoot && topRoot.confidence > 50;
   
-  // 规则: 根腐致缺素
   if (isRootBad && ["root_rot_fungal", "nematodes", "root_hypoxia"].includes(topRoot.code)) {
     ["N", "Fe", "Zn", "Mg", "B", "Mn", "deficiency_Fe_Zn", "deficiency_Mg"].forEach(nutri => {
       if (mergedMap[nutri]) {
-        mergedMap[nutri].confidence *= 0.6; // 降低缺素置信度
-        mergedMap[topRoot.code].confidence = Math.min(99, mergedMap[topRoot.code].confidence + 15); // 提高根病置信度
-        mergedMap[topRoot.code].synergyLog = `根部[${topRoot.name}]导致养分吸收受阻，引发地上部缺素假象。`;
+        mergedMap[nutri].confidence *= 0.5; // V5.0: 加大惩罚力度，从 0.6 改为 0.5
+        mergedMap[topRoot.code].confidence = Math.min(99, mergedMap[topRoot.code].confidence + 15);
+        mergedMap[topRoot.code].synergyLog = `根部[${topRoot.name}]导致养分吸收受阻，引发地上部缺素假象，请优先治根。`;
       }
     });
   }
 }
 
-// ---------------------- 4. 【核心升级】时空记忆逻辑 (V4.0) ----------------------
+// ====================== 4. 时空记忆 (V4.0/5.0) ======================
 
-/**
- * 历史追溯：根据上一条诊断记录修正当前概率
- */
 function applyHistoryBias(mergedMap, lastRecord) {
   if (!lastRecord || !lastRecord.diagnosis) return null;
-
-  // 计算时间差 (天)
   const now = new Date().getTime();
   const lastTime = lastRecord.timestamp || now;
   const daysDiff = Math.floor((now - lastTime) / (1000 * 60 * 60 * 24));
 
-  // 只追溯 30 天内的记录
-  if (daysDiff > 30) return null;
+  if (daysDiff > 45) return null; // V5.0: 放宽到 45 天
 
   const lastCode = lastRecord.diagnosis;
   const log = [];
 
-  // 1. 同病相怜 (Recurrence): 如果这次也怀疑是同一个病，概率大增
   if (mergedMap[lastCode]) {
-    // 衰减系数：时间越近，影响越大
-    const boost = Math.max(0, 20 - daysDiff); 
+    const boost = Math.max(0, 20 - (daysDiff / 2)); 
     mergedMap[lastCode].confidence = Math.min(99, mergedMap[lastCode].confidence + boost);
     mergedMap[lastCode].score += 5;
-    log.push(`检测到 ${daysDiff} 天前曾确诊【${mapCodeToName(lastCode)}】，判定为病情持续或复发。`);
+    log.push(`${daysDiff} 天前曾确诊【${mapCodeToName(lastCode)}】，判定为病情持续或复发。`);
   }
 
-  // 2. 关联演变 (Progression): 比如 上次是红蜘蛛 -> 这次叶片发白
   if (lastCode === 'red_spider' && mergedMap['deficiency_Fe_Zn']) {
-    mergedMap['deficiency_Fe_Zn'].confidence *= 0.8; // 排除缺素
-    // 如果列表里有红蜘蛛，提升它
+    mergedMap['deficiency_Fe_Zn'].confidence *= 0.7;
     if (mergedMap['red_spider']) {
         mergedMap['red_spider'].confidence += 15;
-        log.push(`基于历史红蜘蛛病史，当前叶片症状极可能为虫害后遗症。`);
+        log.push(`基于历史红蜘蛛病史，当前叶片症状极可能为虫害后遗症（白化）。`);
     }
   }
 
   return log.length > 0 ? log.join(";") : null;
 }
 
-/**
- * 未来预警：生成 Prognosis
- */
 function predictFuture(topRisk, month) {
   if (!topRisk) return null;
   const m = parseInt(month || 1);
   const code = topRisk.code;
   const predictions = [];
 
-  // 规则 1: 传染性病害在雨季的预警
   if (["canker", "anthracnose", "root_rot_fungal"].includes(code)) {
-    if (m >= 4 && m <= 8) {
-      predictions.push("下月进入高温雨季，此病害极易随雨水爆发式扩散，务必在雨前喷施铜制剂封锁。");
+    if (m >= 4 && m <= 9) { // V5.0: 延长雨季预警范围
+      predictions.push("当前处于高湿季节，病菌极易随风雨扩散，建议全园喷施保护性杀菌剂。");
     }
   }
 
-  // 规则 2: 虫害迭代
   if (code === "red_spider") {
-    predictions.push("红蜘蛛繁殖极快，建议 7 天后复查一次，防止卵块孵化造成二次爆发。");
+    predictions.push("红蜘蛛具有极强抗药性，建议 5-7 天后更换药剂机理再次消杀。");
   }
 
-  // 规则 3: 根系影响果实
   if (code === "root_rot_fungal" || code === "nematodes") {
-    if (m >= 9 && m <= 11) {
-      predictions.push("根系受损将严重影响秋梢转绿和果实膨大，警惕后期出现大量‘太阳果’或落果。");
-    }
+    predictions.push("根系受损是不可逆的，后期极易出现果实偏小、落果，需尽快淋施生根剂保树。");
   }
 
   return predictions.length > 0 ? predictions : null;
 }
 
-/**
- * 动态生成诊断逻辑文本 (升级版)
- */
-function generateDynamicLogic(topRisk, rootRisks, historyLog, futureLog) {
-  if (!topRisk) return "未检测到明显异常，建议加强日常管理。";
+function generateDynamicLogic(topRisk, rootRisks, historyLog, futureLog, envLog) {
+  if (!topRisk || topRisk.confidence < 20) return "未检测到明显病害特征，建议加强水肥管理，持续观察。";
 
   const diseaseName = topRisk.name;
+  let text = `【V5.0 全息诊断】\n综合判定主病为【${diseaseName}】，置信度 ${topRisk.confidence}%。`;
   
-  let text = `经 V4.0 引擎综合分析，主病判定为【${diseaseName}】（置信度 ${topRisk.confidence}%）。`;
+  // 证据展示
+  if (topRisk.evidences && topRisk.evidences.length > 0) {
+    text += `\n\n📌 核心依据：用户描述了 ${topRisk.evidences.join('、')} 等特征。`;
+  }
+
+  if (envLog && envLog.length > 0) {
+    text += `\n\n☁️ 环境分析：${envLog.join('')}`;
+  }
   
-  // 1. 协同分析
   if (topRisk.synergyLog) {
     text += `\n\n🔍 根叶关联：${topRisk.synergyLog}`;
   } 
   
-  // 2. 历史追溯 (V4.0 新增)
   if (historyLog) {
     text += `\n\n📜 病史追踪：${historyLog}`;
   }
 
-  // 3. 未来预警 (V4.0 新增)
   if (futureLog && futureLog.length > 0) {
-    text += `\n\n🔮 风险预警：${futureLog.join('')}`;
+    text += `\n\n🔮 专家预警：${futureLog.join('')}`;
   }
 
   return text;
 }
 
-// ---------------------- 5. 引擎入口 ----------------------
+// ====================== 5. 引擎入口 ======================
 
 const DiagnosticEngine = {
+  /**
+   * @param {Object} options
+   * options.weather: { temp: 25, rain: false, humidity: 60 } // 新增参数
+   */
   runCombined(options) {
-    const { positions, answers, month, lastRecord } = options; // 接收 lastRecord
+    const { positions, answers, month, lastRecord, weather } = options; 
     const phenologyKey = getPhenologyKey(month);
 
-    // 1. 微观计算
+    // 1. 微观计算 (初步算分)
     let leafRisks = [], fruitRisks = [], rootRisks = [];
     if (positions.includes("leaf")) leafRisks = calculateMicroCauses(answers.leaf, leafConfig, phenologyKey);
     if (positions.includes("fruit")) fruitRisks = calculateMicroCauses(answers.fruit, fruitConfig, phenologyKey);
     rootRisks = calculateMicroCauses(answers.root, rootConfig, phenologyKey);
 
-    // 2. 合并初步结果
+    // 2. 合并结果
     const mergedMap = {};
     [...leafRisks, ...fruitRisks, ...rootRisks].forEach(item => {
+      // 过滤掉负分或极低分项
+      if (item.score <= -10) return; 
+
       if (!mergedMap[item.code]) {
         mergedMap[item.code] = { ...item };
       } else {
         mergedMap[item.code].score += item.score;
-        mergedMap[item.code].confidence = calculateConfidence(mergedMap[item.code].score);
-        mergedMap[item.code].evidences = [...mergedMap[item.code].evidences, ...item.evidences];
+        mergedMap[item.code].evidences = [...new Set([...mergedMap[item.code].evidences, ...item.evidences])];
       }
     });
 
-    // 3. 执行协同规则 (V3.5)
+    // 3. 【新增】环境感知加权
+    const envLog = applyEnvironmentBias(mergedMap, weather);
+
+    // 重新计算置信度（因为分数被环境改变了）
+    Object.values(mergedMap).forEach(item => {
+      item.confidence = calculateConfidence(item.score);
+    });
+
+    // 4. 协同规则
     applySynergyRules(mergedMap, rootRisks);
 
-    // 4. 【执行历史追溯】 (V4.0)
+    // 5. 历史追溯
     const historyLog = applyHistoryBias(mergedMap, lastRecord);
 
-    // 5. 最终排序
+    // 6. 最终排序
     const finalRanking = Object.values(mergedMap).sort((a, b) => b.confidence - a.confidence);
     const topRisk = finalRanking.length > 0 ? finalRanking[0] : null;
 
-    // 6. 【生成未来预警】 (V4.0)
+    // 7. 未来预警
     const futureLog = predictFuture(topRisk, month);
 
-    // 7. 生成动态报告
-    const dynamicLogic = generateDynamicLogic(topRisk, rootRisks, historyLog, futureLog);
+    // 8. 生成报告
+    const dynamicLogic = generateDynamicLogic(topRisk, rootRisks, historyLog, futureLog, envLog);
 
     const summary = {
       type: "decision_tree_v5",
@@ -259,12 +318,12 @@ const DiagnosticEngine = {
       confidence: topRisk ? topRisk.confidence : 0,
       dynamicLogic: dynamicLogic, 
       rootStatus: (rootRisks[0] && rootRisks[0].confidence > 50) ? rootRisks[0].code : "normal",
-      tags: topRisk ? [mapCodeToName(topRisk.code)] : [] // 简单回填
+      tags: topRisk ? [mapCodeToName(topRisk.code)] : []
     };
 
     if (futureLog) summary.hasFutureWarning = true;
 
-    console.log("📊 [V4.0 时空引擎] 结果:", summary);
+    console.log("📊 [V5.0 全息引擎] 结果:", summary);
     return summary;
   }
 };

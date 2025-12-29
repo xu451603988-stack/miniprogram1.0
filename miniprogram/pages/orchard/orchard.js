@@ -37,7 +37,7 @@ Page({
     try {
       // 1. 获取果园基础信息 
       const orchardRes = await wx.cloud.callFunction({
-        name: 'orchardFunctions',
+        name: 'orchardService',
         data: { type: 'getMyOrchard' }
       });
       
@@ -58,7 +58,7 @@ Page({
 
       // 2. 获取当月农事方案 
       const taskRes = await wx.cloud.callFunction({
-        name: 'orchardFunctions',
+        name: 'orchardService',
         data: { type: 'getMonthlyTask', month: this.data.currentMonth }
       });
       
@@ -93,7 +93,7 @@ Page({
 
       // 2. 调用云函数进行精准风险评估 
       const riskRes = await wx.cloud.callFunction({
-        name: 'orchardFunctions',
+        name: 'orchardService',
         data: {
           type: 'getRiskAssessment',
           data: { forecast: mockForecast }
@@ -167,7 +167,7 @@ Page({
     
     try {
       await wx.cloud.callFunction({
-        name: 'orchardFunctions',
+        name: 'orchardService',
         data: {
           type: 'save',
           data: this.data.orchard

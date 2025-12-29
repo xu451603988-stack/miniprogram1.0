@@ -1,0 +1,15 @@
+<view class="container">
+  <view class="title">专家咨询</view>
+
+  <view class="card">
+    <view class="label">说明</view>
+    <view class="text">
+      如需进一步确认病害/虫害原因，请整理：作物品种、发生部位、症状照片、近期气候与管理措施，并联系当地农技人员或平台专家。
+    </view>
+  </view>
+
+  <view class="actions">
+    <button class="btn primary" bindtap="goBackHome">返回首页</button>
+    <button class="btn" bindtap="goHistory">查看历史</button>
+  </view>
+</view>

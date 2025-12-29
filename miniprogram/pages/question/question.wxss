@@ -1,0 +1,64 @@
+.page {
+  padding: 16rpx 24rpx;
+}
+
+.card {
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 24rpx;
+}
+
+.title {
+  font-size: 34rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.hint {
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 18rpx;
+}
+
+.options {
+  margin-top: 10rpx;
+}
+
+.option {
+  padding: 22rpx 20rpx;
+  border: 2rpx solid #eee;
+  border-radius: 16rpx;
+  margin-bottom: 16rpx;
+  background: #fafafa;
+}
+
+/* ✅ 选中态（重要） */
+.option--selected {
+  border-color: #2ecc71;
+  background: #eafff2;
+}
+
+.btn {
+  margin-top: 18rpx;
+}
+
+.tip {
+  margin-top: 10rpx;
+  color: #666;
+  font-size: 24rpx;
+}
+
+.empty {
+  padding: 40rpx 24rpx;
+}
+
+.empty-title {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.empty-desc {
+  margin-top: 12rpx;
+  color: #666;
+  font-size: 26rpx;
+}

@@ -1,43 +1,42 @@
-// pages/welcome/welcome.js
-const app = getApp();
-
+// miniprogram/pages/welcome/welcome.js
 Page({
   data: {},
 
-  onLoad() {
-    // 可以在这里预加载一些数据
-  },
-
   // 开始诊断
   onStart() {
-    wx.navigateTo({
-      url: '/pages/cropSelect/cropSelect',
-    });
+    // 你当前主流程：先选作物
+    this._safeNav('/pages/cropSelect/cropSelect', '作物选择页未配置')
   },
 
-  // 跳转会员中心 (新增)
+  // 会员中心
   toUser() {
-    // 尝试跳转 (如果user是tabbar页面，请改用 wx.switchTab)
-    wx.navigateTo({
-      url: '/pages/user/user',
-      fail: (err) => {
-        // 如果失败（比如user是底部tab页），尝试 switchTab
-        wx.switchTab({ url: '/pages/user/user' });
-      }
-    });
+    // 你项目里通常叫 /pages/user/user
+    // 如果你实际页面不是这个路径，告诉我你 pages 下真实路径，我再给你改成对应的
+    this._safeNav('/pages/user/user', '会员中心页面未配置')
   },
 
-  // 跳转历史记录
+  // 诊断记录
   toHistory() {
-    wx.navigateTo({
-      url: '/pages/diagnosis/history/history',
-    });
+    this._safeNav('/pages/history/history', '诊断记录页面未配置')
   },
 
   // 联系专家
   toExpert() {
-    wx.makePhoneCall({
-      phoneNumber: '13800000000', // 请替换为您的客服电话
-    });
+    this._safeNav('/pages/expert/expert', '联系专家页面未配置')
+  },
+
+  // ============ 兼容旧方法名（避免其它地方还在调用） ============
+  startDiagnosis() { this.onStart() },
+  goHistory() { this.toHistory() },
+
+  // ============ 通用兜底跳转 ============
+  _safeNav(url, failText) {
+    wx.navigateTo({
+      url,
+      fail: (e) => {
+        console.warn('[safeNav] nav fail:', url, e)
+        wx.showToast({ title: failText || '页面未配置', icon: 'none' })
+      }
+    })
   }
-});
+})
