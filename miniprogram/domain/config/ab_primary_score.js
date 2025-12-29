@@ -1,0 +1,89 @@
+// miniprogram/domain/config/ab_primary_score.js
+module.exports = {
+  LEAF_SOOTY_MOLD: {
+    base: 0.25,
+    scoreCap: 0.75,
+    strong: [
+      { key: 'insects_visible', values: ['yes'], score: 0.35 },
+      { key: 'leaf_surface', values: ['sticky_black'], score: 0.35 }
+    ],
+    weak: [
+      { key: 'season', values: ['summer', 'autumn'], score: 0.10 }
+    ],
+    penalty: [
+      { key: 'leaf_spots_type', values: ['ring_spot', 'water_soaked'], score: 0.25 }
+    ]
+  },
+
+  LEAF_SPOTS: {
+    base: 0.30,
+    scoreCap: 0.75,
+    strong: [
+      { key: 'leaf_spots_type', values: ['ring_spot', 'brown_spot'], score: 0.40 },
+      { key: 'leaf_edge', values: ['necrotic'], score: 0.25 }
+    ],
+    weak: [
+      { key: 'humidity', values: ['high'], score: 0.10 }
+    ],
+    penalty: [
+      { key: 'insects_visible', values: ['yes'], score: 0.20 }
+    ]
+  },
+
+  LEAF_YELLOWING: {
+    base: 0.35,
+    scoreCap: 0.65,
+    strong: [
+      { key: 'yellow_stage', values: ['new_leaf', 'whole'], score: 0.35 },
+      { key: 'vein_color', values: ['green'], score: 0.25 }
+    ],
+    weak: [
+      { key: 'soil_fertility', values: ['low'], score: 0.10 }
+    ],
+    penalty: [
+      { key: 'leaf_spots_type', values: ['ring_spot', 'brown_spot'], score: 0.25 }
+    ]
+  },
+
+  FRUIT_CRACKING: {
+    base: 0.30,
+    scoreCap: 0.75,
+    strong: [
+      { key: 'fruit_crack_pattern', values: ['radial', 'ring'], score: 0.45 }
+    ],
+    weak: [
+      { key: 'irrigation_change', values: ['sudden'], score: 0.15 }
+    ],
+    penalty: [
+      { key: 'fruit_rot', values: ['yes'], score: 0.25 }
+    ]
+  },
+
+  BRANCH_GUMMING: {
+    base: 0.30,
+    scoreCap: 0.75,
+    strong: [
+      { key: 'branch_gum_color', values: ['amber', 'dark'], score: 0.45 }
+    ],
+    weak: [
+      { key: 'wound_present', values: ['yes'], score: 0.10 }
+    ],
+    penalty: [
+      { key: 'insects_visible', values: ['yes'], score: 0.20 }
+    ]
+  },
+
+  ROOT_ROT_RISK: {
+    base: 0.25,
+    scoreCap: 0.65,
+    strong: [
+      { key: 'soil_waterlog', values: ['yes'], score: 0.40 }
+    ],
+    weak: [
+      { key: 'root_smell', values: ['bad'], score: 0.15 }
+    ],
+    penalty: [
+      { key: 'drought', values: ['yes'], score: 0.20 }
+    ]
+  }
+};

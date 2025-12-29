@@ -1,0 +1,125 @@
+# --------------------------------------------------
+# B 辅风险标签映射表（Risk Tag Mapping）
+# --------------------------------------------------
+
+# A 主诊断 → 默认风险倾向
+codeDefaults:
+  LEAF_SOOTY_MOLD:
+    - key: worm_vector
+      score: 60
+      why:
+        - 害虫分泌蜜露易诱发煤污病
+      advice:
+        - 重点防治蚜虫、粉虱等刺吸式害虫
+
+    - key: damp_heat
+      score: 40
+      why:
+        - 高温高湿环境利于煤污菌生长
+      advice:
+        - 改善通风，降低园内湿度
+
+  LEAF_YELLOWING:
+    - key: nutrition_imbalance
+      score: 60
+      why:
+        - 黄化常与缺素或吸收受阻有关
+      advice:
+        - 检查施肥结构，补充微量元素
+
+  FRUIT_CRACKING:
+    - key: water_fluctuation
+      score: 70
+      why:
+        - 水分忽多忽少易导致果实胀裂
+      advice:
+        - 保持水分供应稳定，避免大水漫灌
+
+  ROOT_ROT_RISK:
+    - key: waterlogging
+      score: 80
+      why:
+        - 长期积水易导致根系缺氧腐烂
+      advice:
+        - 疏通排水沟，避免积水
+
+
+# 问卷答案 → 风险信号叠加
+answerSignals:
+  - key: worm_vector
+    when:
+      answerKey: insects_visible
+      values: [yes]
+    add: 40
+    why:
+      - 发现明显害虫活动
+    advice:
+      - 及时进行针对性防治
+
+  - key: damp_heat
+    when:
+      answerKey: humidity
+      values: [high]
+    add: 30
+    why:
+      - 当前环境湿度较高
+    advice:
+      - 注意通风降湿
+
+  - key: waterlogging
+    when:
+      answerKey: soil_waterlog
+      values: [yes]
+    add: 50
+    why:
+      - 土壤存在积水现象
+    advice:
+      - 尽快改善排水条件
+
+  - key: nutrition_imbalance
+    when:
+      answerKey: soil_fertility
+      values: [low]
+    add: 30
+    why:
+      - 土壤肥力偏低
+    advice:
+      - 合理追肥，补充营养
+
+
+# 风险标签元信息（词典）
+tagMeta:
+  worm_vector:
+    label: 害虫传播风险
+    explain: 害虫活动不仅直接危害植株，还可能传播病原或诱发次生病害
+    advice:
+      - 定期巡园
+      - 采用综合防治措施
+
+  damp_heat:
+    label: 高温高湿风险
+    explain: 高温高湿环境有利于多种病害发生和扩散
+    advice:
+      - 合理修剪
+      - 改善通风透光
+
+  nutrition_imbalance:
+    label: 营养失衡风险
+    explain: 营养供应不足或比例失衡会导致植株生长异常
+    advice:
+      - 测土配方施肥
+      - 补充微量元素
+
+  water_fluctuation:
+    label: 水分波动风险
+    explain: 水分供应不稳定会对果实和根系造成生理压力
+    advice:
+      - 均衡灌溉
+      - 避免忽干忽湿
+
+  waterlogging:
+    label: 积水渍害风险
+    explain: 长期积水会导致根系缺氧，诱发根腐
+    advice:
+      - 加强排水
+      - 雨后及时检查园地
