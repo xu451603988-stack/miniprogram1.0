@@ -3,15 +3,8 @@
  * --------------------------------------------------
  * 算法调度总入口（Algorithm Orchestrator）
  *
- * 职责：
- * 1. 接收问卷 answers
- * 2. 调用 A 主打分引擎（Primary）
- * 3. 生成 B 辅 riskTags（RiskTagger）
- * 4. 汇总 candidates / evidence / meta
- * 5. 输出统一 report（供 result 页装配）
- *
- * ⚠️ 本文件不写任何 UI 文案
- * ⚠️ 不直接 require 方案库（solutions）
+ * 最小增强：
+ * - 输出结构化 needMoreKeys（不给 UI，不调度，只声明“缺什么”）
  */
 
 const primaryScoreEngine = require('../algorithms/primaryScoreEngine');
@@ -19,7 +12,7 @@ const riskTagger = require('../algorithms/riskTagger');
 
 /**
  * 统一入口
- * @param {Object} answers - 问卷答案（questionConfig 的 key）
+ * @param {Object} answers - 问卷答案
  * @returns {Object} report
  */
 function run(answers = {}) {
@@ -40,25 +33,10 @@ function run(answers = {}) {
     context,
   });
 
-  /**
-   * primaryResult 结构约定：
-   * {
-   *   candidates: [
-   *     { code, score, evidence: [...] }
-   *   ],
-   *   evidence: [...],
-   *   meta: {
-   *     scoreCap?: 0.75,
-   *     missingKeys?: []
-   *   }
-   * }
-   */
-
   const candidates = Array.isArray(primaryResult.candidates)
     ? primaryResult.candidates
     : [];
 
-  // 排序（防御性）
   const sortedCandidates = candidates
     .slice()
     .sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -85,14 +63,38 @@ function run(answers = {}) {
 
     elapsedMs: Date.now() - startTime,
 
-    // 算法调试信息（不会在 UI 主视图展示）
     scoreCap: primaryResult.meta?.scoreCap,
     missingKeys: primaryResult.meta?.missingKeys || [],
   };
 
+  /**
+   * ===============================
+   * ★ 最小增强：结构化缺口声明
+   * ===============================
+   */
+  let needMoreKeys = [];
+
+  // 1️⃣ primary 引擎已经明确声明缺口（最优）
+  if (Array.isArray(primaryResult.meta?.missingKeys) && primaryResult.meta.missingKeys.length > 0) {
+    needMoreKeys = primaryResult.meta.missingKeys.slice();
+  }
+
+  // 2️⃣ 否则：基于病种 + 不确定性，做一次最小兜底
+  if (needMoreKeys.length === 0) {
+    const score = topCandidate ? Number(topCandidate.score || 0) : 0;
+
+    if (score < 0.65 && topCandidate?.code === 'FRUIT_CRACKING') {
+      needMoreKeys.push(
+        'FRUIT_CRACKING_WATER_SWING',
+        'FRUIT_CRACKING_SHAPE'
+      );
+    }
+  }
+
   // ---------- 输出 report ----------
   return {
     code: topCandidate ? topCandidate.code : '',
+
     candidates: sortedCandidates.map(c => ({
       code: c.code,
       score: Number(c.score || 0),
@@ -102,6 +104,9 @@ function run(answers = {}) {
 
     evidence,
     meta,
+
+    // ★ 新增字段（稳定，不影响现有调用）
+    needMoreKeys,
   };
 }
 

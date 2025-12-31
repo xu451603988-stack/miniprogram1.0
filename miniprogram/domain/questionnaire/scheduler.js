@@ -1,112 +1,102 @@
+/**
+ * scheduler.js
+ *
+ * 作用：
+ * 决定「还要不要问 / 问哪一题」
+ *
+ * MVP 能力：
+ * 1. followupKeys / needMore 优先级最高（只要存在就继续问）
+ * 2. 追问上限（默认最多 3 题）
+ * 3. 已问去重（问过的不再问）
+ * 4. 所有条件都不满足时，才返回 null（结束问卷）
+ */
+
+/**
+ * 默认最大追问数量
+ * 防止无限追问
+ */
+const MAX_FOLLOWUPS = 3;
+
+/**
+ * answers 中哪些 key 视为「已经回答过」
+ * unknown 也算回答过（符合你之前的约定）
+ */
 function isAnswered(answers, key) {
-  return answers[key] !== undefined && answers[key] !== null;
+  return Object.prototype.hasOwnProperty.call(answers || {}, key);
 }
 
-// ✅ 问卷层强制追问（不依赖算法 needs）
-// 规则：主诉命中某类问题 → 优先追问关键一题
-function getForcedFollowup(answers = {}) {
-  const symptoms = Array.isArray(answers.symptoms) ? answers.symptoms : [];
+/**
+ * 主调度函数
+ *
+ * @param {Object} options
+ * @param {Object} options.answers         当前所有答案
+ * @param {string[]} options.followupKeys  结构化缺口 key（最高优先级）
+ * @param {Array} options.needMore          可选：[{ key, questionId, reason }]
+ * @param {string[]} options.askedKeys      已经问过的 key（防复读）
+ *
+ * @returns {Object|null}
+ *   { questionId, key, from } 或 null（表示结束）
+ */
+module.exports = function scheduler(options = {}) {
+  const {
+    answers = {},
+    followupKeys = [],
+    needMore = [],
+    askedKeys = []
+  } = options;
 
-  const has = (v) => symptoms.indexOf(v) >= 0;
-
-  // 1) 叶：煤污 → 必问害虫可见
-  if (has('leaf_sooty') && !isAnswered(answers, 'insects_visible')) {
-    return {
-      key: 'insects_visible',
-      questionId: 'Q_INSECTS_VISIBLE',
-      priority: 100,
-      fromRule: 'forced:leaf_sooty'
-    };
+  /**
+   * ===== 0. 追问次数上限 =====
+   */
+  if (Array.isArray(askedKeys) && askedKeys.length >= MAX_FOLLOWUPS) {
+    return null;
   }
 
-  // 2) 叶：斑点 → 必问斑点形态
-  if (has('leaf_spots') && !isAnswered(answers, 'spots_shape')) {
-    return {
-      key: 'spots_shape',
-      questionId: 'Q_SPOTS_SHAPE',
-      priority: 95,
-      fromRule: 'forced:leaf_spots'
-    };
+  /**
+   * ===== 1. followupKeys（最高优先级）=====
+   * 这是 MVP 的核心
+   */
+  if (Array.isArray(followupKeys) && followupKeys.length > 0) {
+    for (const key of followupKeys) {
+      // 已经问过的，不再问
+      if (askedKeys.includes(key)) continue;
+
+      // 已经回答过的，不再问
+      if (isAnswered(answers, key)) continue;
+
+      return {
+        key,
+        // MVP 约定：followupKey === questionId
+        questionId: key,
+        from: 'followupKeys'
+      };
+    }
   }
 
-  // 3) 叶：黄化 → 必问发生阶段
-  if (has('leaf_yellowing') && !isAnswered(answers, 'yellow_stage')) {
-    return {
-      key: 'yellow_stage',
-      questionId: 'Q_YELLOW_STAGE',
-      priority: 90,
-      fromRule: 'forced:leaf_yellowing'
-    };
+  /**
+   * ===== 2. needMore（结构化缺口，次高优先级）=====
+   * 格式：[{ key, questionId?, reason }]
+   */
+  if (Array.isArray(needMore) && needMore.length > 0) {
+    for (const item of needMore) {
+      if (!item || !item.key) continue;
+
+      const key = item.key;
+      const questionId = item.questionId || key;
+
+      if (askedKeys.includes(key)) continue;
+      if (isAnswered(answers, key)) continue;
+
+      return {
+        key,
+        questionId,
+        from: 'needMore'
+      };
+    }
   }
 
-  // 4) 果：果斑 → 必问果斑类型
-  if (has('fruit_spots') && !isAnswered(answers, 'fruit_spots_type')) {
-    return {
-      key: 'fruit_spots_type',
-      questionId: 'Q_FRUIT_SPOTS_TYPE',
-      priority: 90,
-      fromRule: 'forced:fruit_spots'
-    };
-  }
-
-  // 5) 果：裂果 → 必问裂果形态
-  if (has('fruit_cracking') && !isAnswered(answers, 'fruit_crack_pattern')) {
-    return {
-      key: 'fruit_crack_pattern',
-      questionId: 'Q_FRUIT_CRACK_PATTERN',
-      priority: 90,
-      fromRule: 'forced:fruit_cracking'
-    };
-  }
-
-  // 6) 枝：流胶 → 必问流胶颜色
-  if (has('branch_gumming') && !isAnswered(answers, 'branch_gum_color')) {
-    return {
-      key: 'branch_gum_color',
-      questionId: 'Q_BRANCH_GUM_COLOR',
-      priority: 90,
-      fromRule: 'forced:branch_gumming'
-    };
-  }
-
-  // 7) 根：疑似烂根/积水 → 必问排水积水
-  if ((has('root_vigor') || has('soil_waterlog_smell')) && !isAnswered(answers, 'soil_waterlog')) {
-    return {
-      key: 'soil_waterlog',
-      questionId: 'Q_SOIL_WATERLOG',
-      priority: 85,
-      fromRule: 'forced:root'
-    };
-  }
-
+  /**
+   * ===== 3. 无可追问缺口，结束问卷 =====
+   */
   return null;
-}
-
-module.exports = function scheduler(answers = {}, ruleResults = []) {
-  // ✅ 第一优先：问卷层强制追问
-  const forced = getForcedFollowup(answers);
-  if (forced) return forced;
-
-  // ✅ 第二优先：算法规则 needs（如果规则里写了，也继续支持）
-  const needs = [];
-
-  (ruleResults || []).forEach(rule => {
-    if (!rule || !Array.isArray(rule.needs)) return;
-
-    rule.needs.forEach(n => {
-      if (!n || !n.key || !n.questionId) return;
-      needs.push({
-        key: n.key,
-        questionId: n.questionId,
-        priority: Number(n.priority) || 0,
-        fromRule: rule.code || 'unknown'
-      });
-    });
-  });
-
-  const pending = needs.filter(n => !isAnswered(answers, n.key));
-  if (pending.length === 0) return null;
-
-  pending.sort((a, b) => b.priority - a.priority);
-  return pending[0];
 };
