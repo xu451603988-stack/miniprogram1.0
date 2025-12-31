@@ -1,175 +1,341 @@
 // miniprogram/pages/question/question.js
-const app = getApp()
+const app = getApp();
 
-// ✅ 方案1：页面内直接引入调度器与题库（不依赖 app 上挂函数）
-const scheduler = require('../../domain/questionnaire/scheduler')
-const questionBank = require('../../domain/questionnaire/questionBank')
+const scheduler = require('../../domain/questionnaire/scheduler');
+const questionBank = require('../../domain/questionnaire/questionBank');
 
-function safeDecode(v) {
-  try { return decodeURIComponent(v) } catch (e) { return v }
+const orchestrator = require('../../domain/orchestrator/diagnosisEngine.js');
+const AssemblyMod = require('../../domain/assembly/index.js');
+const assemble = (AssemblyMod && typeof AssemblyMod.assemble === 'function')
+  ? AssemblyMod.assemble
+  : AssemblyMod;
+
+const solutions = require('../../domain/solutions/index.js');
+const expertDictionary = require('../../domain/dictionary/expertDictionary.js');
+const treatmentPlans = require('../../domain/dictionary/treatmentPlans.js');
+
+const fruitQuestions = require('../../data/questionnaire/fruit_questions.js');
+const leafQuestions = require('../../data/questionnaire/leaf_questions.js');
+const rootQuestions = require('../../data/questionnaire/root_questions.js');
+
+function parseCSV(v) {
+  if (!v) return [];
+  return String(v).split(',').map(s => s.trim()).filter(Boolean);
 }
-function isAnswered(answers, key) {
-  return answers && answers[key] !== undefined && answers[key] !== null
+
+function buildSelectedMapFromValue(value) {
+  const map = {};
+  if (Array.isArray(value)) value.forEach(v => { map[v] = true; });
+  else if (value !== undefined && value !== null) map[value] = true;
+  return map;
+}
+
+// 归一题型：leaf_questions 里是 multiple；wxml 只认 multi
+function normalizeQuestion(q) {
+  if (!q) return q;
+  const type = (q.type === 'multiple') ? 'multi' : q.type;
+  return { ...q, type };
+}
+
+function pickBaseBank(positions = []) {
+  // branch 暂无题库，先当 leaf 处理
+  if (positions.includes('fruit')) return fruitQuestions;
+  if (positions.includes('leaf')) return leafQuestions;
+  if (positions.includes('root')) return rootQuestions;
+  if (positions.includes('branch')) return leafQuestions;
+  return leafQuestions;
+}
+
+function compactPkg(fullPkg) {
+  if (!fullPkg) return null;
+  return {
+    meta: fullPkg.meta,
+    summary: fullPkg.summary,
+    primarySection: fullPkg.primarySection,
+    riskSection: fullPkg.riskSection,
+    alternativesSection: fullPkg.alternativesSection,
+    nextSteps: fullPkg.nextSteps
+  };
 }
 
 Page({
   data: {
+    // 渲染
     currentQuestion: null,
+    selectedMap: {},
+
+    // 答案与调度
     answers: {},
-    selectedOptions: [],
-    meta: {
-      crop: 'citrus',
-      month: new Date().getMonth() + 1,
-      mode: 'single',
-      positions: []
-    }
+    askedKeys: [],
+
+    // base 问卷链路
+    stage: 'base',          // 'base' | 'followup'
+    baseBank: null,
+    baseNodeId: 'start',
+
+    // followup 追问输入
+    followupKeys: [],
+    needMore: [],
+
+    // 上下文
+    crop: 'citrus',
+    month: new Date().getMonth() + 1,
+    positions: []
   },
 
   onLoad(options = {}) {
-    // 1) meta：从 positionSelect 带过来的参数
-    const crop = options.crop ? safeDecode(options.crop) : 'citrus'
-    const month = options.month ? Number(safeDecode(options.month)) : (new Date().getMonth() + 1)
-    const mode = options.mode ? safeDecode(options.mode) : 'single'
-    const positionsStr = options.positions ? safeDecode(options.positions) : ''
-    const positions = positionsStr ? positionsStr.split(',').filter(Boolean) : []
+    const crop = options.crop ? decodeURIComponent(options.crop) : 'citrus';
+    const month = options.month ? Number(decodeURIComponent(options.month)) : (new Date().getMonth() + 1);
+    const positions = options.positions ? parseCSV(decodeURIComponent(options.positions)) : [];
 
-    const meta = { crop, month, mode, positions }
+    // 新一轮从 positionSelect 进来通常会清空缓存，这里再兜底一次
+    const answers = wx.getStorageSync('last_diagnosis_answers') || {};
+    answers.crop = crop;
+    answers.month = month;
+    answers.positions = positions;
 
-    // 2) 恢复答案：优先 last_diagnosis_answers，其次兼容旧 answers
-    const savedAnswers =
-      wx.getStorageSync('last_diagnosis_answers') ||
-      wx.getStorageSync('answers') ||
-      {}
+    const baseBank = pickBaseBank(positions);
 
-    this.setData({ meta, answers: savedAnswers })
+    this.setData({
+      crop, month, positions,
+      answers,
+      askedKeys: [],
+      stage: 'base',
+      baseBank,
+      baseNodeId: 'start',
+      followupKeys: wx.getStorageSync('last_followup_keys') || [],
+      needMore: wx.getStorageSync('last_need_more') || []
+    });
 
-    // 3) 给结果页兜底
-    app.globalData.diagnosisMeta = meta
-    app.globalData.diagnosisAnswers = savedAnswers
-    wx.setStorageSync('last_diagnosis_meta', meta)
+    wx.setStorageSync('last_diagnosis_answers', answers);
+    wx.setStorageSync('answers', answers);
 
-    // 4) 加载下一题
-    this.loadNextQuestion()
+    this.loadNextQuestion();
   },
 
-  /**
-   * ✅ 核心：加载下一题
-   * - 首题必须先出主诉 Q_CHIEF_COMPLAINT（否则 scheduler 第一轮必然 null）
-   * - 主诉答完后，再交给 scheduler 走“强制追问/needs”
-   */
   loadNextQuestion() {
-    const { answers, meta } = this.data
-    const ctx = { positions: meta.positions || [] }
+    if (this.data.stage === 'base') {
+      this.loadBaseQuestion();
+    } else {
+      this.loadFollowupQuestion();
+    }
+  },
 
-    // 0) 首题兜底：没回答 symptoms 就必须先问主诉
-    if (!isAnswered(answers, 'symptoms')) {
-      const chief = questionBank.getQuestion('Q_CHIEF_COMPLAINT', ctx)
-      if (!chief) {
-        wx.showToast({ title: '题库缺失：主诉题未生成', icon: 'none' })
-        this.goResult()
-        return
-      }
-      this.setData({
-        currentQuestion: chief,
-        selectedOptions: this.initSelectedOptions(chief)
-      })
-      return
+  // ========== base 问卷 ==========
+  loadBaseQuestion() {
+    const { baseBank, baseNodeId, answers } = this.data;
+    const node = baseBank && baseBank[baseNodeId];
+
+    if (!node) {
+      // base 题库异常：直接尝试结算
+      this.finishAndMaybeFollowup();
+      return;
     }
 
-    // 1) 主诉已有：交给 scheduler 决定追问
-    const next = scheduler(answers, [])
+    const q = normalizeQuestion(node);
+    const existing = answers[q.id];
+    this.setData({
+      currentQuestion: q,
+      selectedMap: buildSelectedMapFromValue(existing)
+    });
+  },
 
-    // 2) scheduler 认为结束：进结果页
+  advanceBaseNode(chosenValue) {
+    const q = this.data.currentQuestion;
+    const bank = this.data.baseBank;
+
+    const v = Array.isArray(chosenValue) ? chosenValue[0] : chosenValue;
+    const opt = (q.options || []).find(o => o.value === v);
+
+    // 没找到 next / 或 isEnd 就结束 base
+    if (!opt || opt.isEnd || !opt.next || !bank[opt.next]) {
+      this.finishAndMaybeFollowup();
+      return;
+    }
+
+    this.setData({ baseNodeId: opt.next });
+    this.loadNextQuestion();
+  },
+
+  // ========== followup 追问 ==========
+  loadFollowupQuestion() {
+    const { answers, followupKeys, needMore, askedKeys } = this.data;
+
+    const next = scheduler({
+      answers,
+      followupKeys,
+      needMore,
+      askedKeys
+    });
+
     if (!next || !next.questionId) {
-      this.goResult()
-      return
+      // 追问也结束了，直接进结果页
+      this.goResult();
+      return;
     }
 
-    const q = questionBank.getQuestion(next.questionId, ctx)
+    const q0 = questionBank.getQuestion(next.questionId);
+    const q = normalizeQuestion(q0);
+
     if (!q) {
-      wx.showToast({ title: '题库缺失，直接生成结果', icon: 'none' })
-      this.goResult()
-      return
+      this.goResult();
+      return;
     }
+
+    const existing = (answers[q.key] !== undefined) ? answers[q.key] : answers[q.id];
 
     this.setData({
       currentQuestion: q,
-      selectedOptions: this.initSelectedOptions(q)
-    })
+      selectedMap: buildSelectedMapFromValue(existing),
+      askedKeys: askedKeys.concat(next.key)
+    });
   },
 
-  initSelectedOptions(question) {
-    const v = this.data.answers[question.key]
-    return Array.isArray(v) ? [...v] : []
-  },
-
-  // 单选题：点一下就保存并进入下一题
-  onSelectSingle(e) {
-    const { value } = e.currentTarget.dataset
-    const q = this.data.currentQuestion
-    if (!q) return
-    this.saveAnswer(q.key, value)
-    this.loadNextQuestion()
-  },
-
-  // 多选题：点选项只变更选中态
+  // ========== wxml 事件 ==========
+  // bindtap="onSelectOption"
   onSelectOption(e) {
-    const { value } = e.currentTarget.dataset
-    const q = this.data.currentQuestion
-    if (!q) return
+    const value = e.currentTarget.dataset.value;
+    const q = this.data.currentQuestion;
+    if (!q || value === undefined) return;
 
-    let arr = Array.isArray(this.data.selectedOptions) ? [...this.data.selectedOptions] : []
+    // 单选：立即提交
+    if (q.type === 'single') {
+      this.setData({ selectedMap: { [value]: true } });
+      this.commitAnswer(value);
 
-    // unknown 互斥（你题库里通常会有）
-    if (value === 'unknown') {
-      arr = ['unknown']
-    } else {
-      arr = arr.filter(v => v !== 'unknown')
-      if (arr.includes(value)) arr = arr.filter(v => v !== value)
-      else arr.push(value)
+      if (this.data.stage === 'base') {
+        this.advanceBaseNode(value);
+      } else {
+        // followup：每答一次就刷新 pkg / followupKeys，保证闭环
+        this.finishAndMaybeFollowup(true);
+      }
+      return;
     }
 
-    // maxSelect（默认 2）
-    const maxSelect = Number(q.maxSelect) || 2
-    if (arr.length > maxSelect) {
-      wx.showToast({ title: `最多选择 ${maxSelect} 项`, icon: 'none' })
-      return
-    }
+    // 多选：toggle，点“下一步”再提交
+    if (q.type === 'multi') {
+      const selectedMap = { ...(this.data.selectedMap || {}) };
 
-    this.setData({ selectedOptions: arr })
+      if (value === 'unknown') {
+        this.setData({ selectedMap: { unknown: true } });
+        return;
+      }
+      if (selectedMap.unknown) delete selectedMap.unknown;
+
+      if (selectedMap[value]) delete selectedMap[value];
+      else selectedMap[value] = true;
+
+      const chosen = Object.keys(selectedMap).filter(k => selectedMap[k]);
+      if (chosen.length > 2) {
+        wx.showToast({ title: '最多选择 2 项', icon: 'none' });
+        delete selectedMap[value];
+      }
+
+      this.setData({ selectedMap });
+    }
   },
 
-  // 多选题：点“确定”才保存并进入下一题
+  // bindtap="onConfirmMulti"
   onConfirmMulti() {
-    const q = this.data.currentQuestion
-    if (!q) return
-    const arr = Array.isArray(this.data.selectedOptions) ? this.data.selectedOptions : []
-    this.saveAnswer(q.key, arr)
-    this.loadNextQuestion()
+    const q = this.data.currentQuestion;
+    if (!q || q.type !== 'multi') return;
+
+    const selectedMap = this.data.selectedMap || {};
+    const values = Object.keys(selectedMap).filter(k => selectedMap[k]);
+
+    if (values.length === 0) {
+      wx.showToast({ title: '请至少选择 1 项', icon: 'none' });
+      return;
+    }
+
+    this.commitAnswer(values);
+
+    if (this.data.stage === 'base') {
+      this.advanceBaseNode(values);
+    } else {
+      this.finishAndMaybeFollowup(true);
+    }
   },
 
-  saveAnswer(key, value) {
-    const answers = { ...(this.data.answers || {}), [key]: value }
-    this.setData({ answers })
+  // 提交答案：base 用 q.id；followup 用 q.key + q.id 双写
+  commitAnswer(value) {
+    const q = this.data.currentQuestion;
+    const answers = { ...(this.data.answers || {}) };
 
-    // ✅ 统一写入口（结果页兜底）
-    app.globalData.diagnosisAnswers = answers
-    wx.setStorageSync('last_diagnosis_answers', answers)
+    if (this.data.stage === 'base') {
+      // base 问卷用 node.id
+      answers[q.id] = value;
+    } else {
+      // followup 问卷：id + key 双写
+      if (q.key) answers[q.key] = value;
+      if (q.id && q.id !== q.key) answers[q.id] = value;
+    }
 
-    // ✅ 兼容旧 key（你工程里还有地方在读 answers）
-    wx.setStorageSync('answers', answers)
+    this.setData({ answers });
+    app.globalData.diagnosisAnswers = answers;
+
+    wx.setStorageSync('last_diagnosis_answers', answers);
+    wx.setStorageSync('answers', answers);
+  },
+
+  /**
+   * base 结束 或 followup 每答一次：都走一次 “结算+更新followupKeys”
+   * @param {boolean} fromFollowup 是否来自追问阶段
+   */
+  finishAndMaybeFollowup(fromFollowup = false) {
+    const answers =
+      this.data.answers ||
+      wx.getStorageSync('last_diagnosis_answers') ||
+      wx.getStorageSync('answers') ||
+      {};
+
+    if (!answers || Object.keys(answers).length === 0) {
+      wx.showToast({ title: '缺少问卷答案', icon: 'none' });
+      return;
+    }
+
+    // 1) 诊断 & assemble
+    let report, fullPkg, pkg;
+    try {
+      report = orchestrator.run(answers);
+      fullPkg = assemble(answers, report, { solutions, expertDictionary, treatmentPlans });
+      pkg = compactPkg(fullPkg);
+
+      wx.setStorageSync('last_assembly_package', pkg);
+      wx.setStorageSync('last_diagnosis_pkg', pkg);
+      wx.setStorageSync('last_diagnosis_answers', answers);
+      wx.setStorageSync('answers', answers);
+    } catch (e) {
+      console.error('[question] finish failed:', e);
+      // 结算失败：直接进结果页（结果页会自己算一次）
+      this.goResult();
+      return;
+    }
+
+    // 2) 拿 followupKeys
+    const nextSteps = pkg && pkg.nextSteps ? pkg.nextSteps : {};
+    const followupKeys = Array.isArray(nextSteps.followupKeys) ? nextSteps.followupKeys : [];
+    const needMore = Array.isArray(nextSteps.needMore) ? nextSteps.needMore : [];
+
+    wx.setStorageSync('last_followup_keys', followupKeys);
+    wx.setStorageSync('last_need_more', needMore);
+
+    // 3) base -> followup（有缺口就继续问），否则结果页
+    if (followupKeys.length > 0 || needMore.length > 0) {
+      this.setData({
+        stage: 'followup',
+        followupKeys,
+        needMore
+      });
+      this.loadNextQuestion();
+      return;
+    }
+
+    // 没缺口：直接结果页
+    this.goResult();
   },
 
   goResult() {
-    const answers = this.data.answers || {}
-    const meta = this.data.meta || null
-
-    app.globalData.diagnosisAnswers = answers
-    if (meta) app.globalData.diagnosisMeta = meta
-
-    wx.setStorageSync('last_diagnosis_answers', answers)
-    if (meta) wx.setStorageSync('last_diagnosis_meta', meta)
-
-    wx.redirectTo({ url: '/pages/result/result' })
+    wx.redirectTo({ url: '/pages/result/result' });
   }
-})
+});

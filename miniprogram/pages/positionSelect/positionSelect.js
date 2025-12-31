@@ -3,71 +3,77 @@ Page({
   data: {
     crop: 'citrus',
     month: new Date().getMonth() + 1,
-    mode: 'single', // single | multi
-    selectedPositions: [],
 
+    // ✅ 必须有 selected 字段（你的 WXML 用 item.selected 来渲染样式/✔）
     positions: [
-      { key: 'leaf', name: '叶片', desc: '叶片发黄、斑点、卷曲等问题' },
-      { key: 'fruit', name: '果实', desc: '果面斑点、裂果、日灼等问题' },
-      { key: 'branch', name: '枝条', desc: '枝梢枯萎、流胶、腐烂等问题' },
-      { key: 'root', name: '根系', desc: '烂根、根腐、土壤异味等问题' }
+      { id: 'leaf',   name: '叶片', desc: '叶片发黄、斑点、卷曲等问题', selected: false, icon: '🍃' },
+      { id: 'fruit',  name: '果实', desc: '果面斑点、裂果、日灼等问题', selected: false, icon: '🍊' },
+      { id: 'branch', name: '枝条', desc: '枝梢枯萎、流胶、腐烂等问题', selected: false, icon: '🌿' },
+      { id: 'root',   name: '根系', desc: '烂根、根腐、土壤异味等问题', selected: false, icon: '🪴' }
     ]
   },
 
   onLoad(options = {}) {
+    // 兼容上游可能传 crop/month
     const crop = options.crop || 'citrus'
     const month = options.month ? Number(options.month) : (new Date().getMonth() + 1)
 
-    this.setData({
-      crop,
-      month
-    })
+    this.setData({ crop, month })
   },
 
-  // 选择部位（支持多选）
+  /* =====================================================
+   * ✅ WXML 绑定的方法（一个不漏）
+   * positionSelect.wxml:
+   *  - bindtap="onTogglePosition" (data-id)
+   *  - bindtap="onStartDiagnosis"
+   * ===================================================== */
+
+  // 点击卡片：切换选中
   onTogglePosition(e) {
-    const key = e.currentTarget.dataset.key
-    const { selectedPositions } = this.data
-
-    let next = Array.isArray(selectedPositions) ? [...selectedPositions] : []
-    if (next.includes(key)) next = next.filter(k => k !== key)
-    else next.push(key)
-
-    // mode：单选/多选
-    const mode = next.length > 1 ? 'multi' : 'single'
-
-    this.setData({
-      selectedPositions: next,
-      mode
-    })
+    this.togglePosition(e)
   },
 
-  // ✅ 兼容你 WXML 里 bindtap="onStartDiagnosis"
+  togglePosition(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+
+    const positions = (this.data.positions || []).map(p => {
+      if (p.id === id) return { ...p, selected: !p.selected }
+      return p
+    })
+
+    this.setData({ positions })
+  },
+
+  // 开始诊断按钮
   onStartDiagnosis() {
     this.goNext()
   },
 
-  // ✅ 你原本“下一步/开始诊断”的逻辑
   goNext() {
-    const { crop, month, mode, selectedPositions } = this.data
+    const positions = this.data.positions || []
+    const selected = positions.filter(p => p.selected).map(p => p.id)
 
-    if (!selectedPositions || selectedPositions.length === 0) {
-      wx.showToast({ title: '请选择部位', icon: 'none' })
+    if (selected.length === 0) {
+      wx.showToast({ title: '请选择至少一个部位', icon: 'none' })
       return
     }
 
-    // ✅ A方案：新一轮诊断，清空上次问卷缓存（关键修复点）
+    const mode = selected.length > 1 ? 'combo' : 'single'
+    const positionsStr = selected.join(',')
+    const crop = this.data.crop || 'citrus'
+    const month = this.data.month || (new Date().getMonth() + 1)
+
+    // ✅ A方案：新一轮诊断清空上次问卷缓存（避免 question 直接结束）
     try {
       wx.removeStorageSync('last_diagnosis_answers')
       wx.removeStorageSync('answers') // 兼容旧key
     } catch (e) {}
 
-    const positionsStr = selectedPositions.join(',')
-
     wx.navigateTo({
-      url: `/pages/question/question?crop=${encodeURIComponent(crop)}&month=${encodeURIComponent(
-        String(month)
-      )}&mode=${encodeURIComponent(mode)}&positions=${encodeURIComponent(positionsStr)}`
+      url: `/pages/question/question?mode=${encodeURIComponent(mode)}&positions=${encodeURIComponent(
+        positionsStr
+      )}&crop=${encodeURIComponent(crop)}&month=${encodeURIComponent(String(month))}`
     })
   }
 })

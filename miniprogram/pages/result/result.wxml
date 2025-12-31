@@ -1,169 +1,110 @@
 <view class="page">
 
-<!-- Summary -->
-<view class="card" wx:if="{{summary}}">
+<!-- A 主：主要判断 + 处置 -->
+<view class="card" wx:if="{{vm}}">
   <view class="header">
     <view class="h-title">诊断结果</view>
-    <view class="h-sub" wx:if="{{meta}}">可信度：{{meta.confidenceLevel || '-'}}</view>
+    <view class="h-sub">判断情况：{{vm.confidenceText}}</view>
   </view>
 
   <view class="primary">
-    <view class="primary-title">{{summary.headline}}</view>
-    <view class="p muted" wx:if="{{summary.subhead}}">{{summary.subhead}}</view>
-  </view>
-
-  <view class="meta" wx:if="{{meta}}">
-    <view class="chip" wx:if="{{meta.primaryScore !== undefined}}">
-      分数：{{meta.primaryScore}}
-    </view>
-    <view class="chip" wx:if="{{meta.answeredKeyCount !== undefined}}">
-      已回答：{{meta.answeredKeyCount}}
-    </view>
-  </view>
-
-  <view class="section" wx:if="{{meta && meta.qualityFlags && meta.qualityFlags.length}}">
-    <view class="section-title">质量标记</view>
-    <view class="notes">
-      <view class="note" wx:for="{{meta.qualityFlags}}" wx:key="index">• {{item}}</view>
-    </view>
-  </view>
-</view>
-
-<!-- Primary Section (A 主) -->
-<view class="card" wx:if="{{primarySection}}">
-  <view class="header">
-    <view class="h-title">A 主：问题与处置</view>
-    <view class="h-sub" wx:if="{{primarySection.score !== undefined}}">score：{{primarySection.score}}</view>
-  </view>
-
-  <view class="primary">
-    <view class="primary-title">{{primarySection.title}}</view>
-    <view class="primary-code">CODE：{{primarySection.code}}</view>
-  </view>
-
-  <!-- Evidence -->
-  <view class="section" wx:if="{{primarySection.evidence && primarySection.evidence.length}}">
-    <view class="section-title">判断依据（Top）</view>
-    <view class="notes">
-      <view class="note" wx:for="{{primarySection.evidence}}" wx:key="index">
-        • {{item.text || item.type}}<text wx:if="{{item.key}}">（{{item.key}}）</text>
-      </view>
-    </view>
+    <view class="primary-title">更像是：{{vm.aTitle}}</view>
+    <view class="p muted" wx:if="{{vm.aSubhead}}">{{vm.aSubhead}}</view>
   </view>
 
   <view class="divider"></view>
 
-  <!-- Actions -->
-  <view class="section" wx:if="{{primarySection.actions}}">
-    <view class="section-title">立即处置方案</view>
-
-    <view class="p" wx:if="{{primarySection.actions.title}}">
-      {{primarySection.actions.title}}
-    </view>
-
-    <view class="steps" wx:if="{{primarySection.actions.steps && primarySection.actions.steps.length}}">
-      <view class="step" wx:for="{{primarySection.actions.steps}}" wx:key="index">
+  <view class="section">
+    <view class="section-title">{{vm.actionsTitle}}</view>
+    <view class="steps" wx:if="{{vm.actionsSteps && vm.actionsSteps.length}}">
+      <view class="step" wx:for="{{vm.actionsSteps}}" wx:key="index">
         <view class="dot"></view>
         <view class="step-text">{{item}}</view>
       </view>
     </view>
 
-    <view class="section" wx:if="{{primarySection.actions.dos && primarySection.actions.dos.length}}">
-      <view class="section-title">建议做</view>
-      <view class="notes">
-        <view class="note" wx:for="{{primarySection.actions.dos}}" wx:key="index">• {{item}}</view>
-      </view>
-    </view>
-
-    <view class="section" wx:if="{{primarySection.actions.donts && primarySection.actions.donts.length}}">
+    <view class="section" wx:if="{{vm.actionsDonts && vm.actionsDonts.length}}">
       <view class="section-title">不建议做</view>
       <view class="notes">
-        <view class="note" wx:for="{{primarySection.actions.donts}}" wx:key="index">• {{item}}</view>
+        <view class="note" wx:for="{{vm.actionsDonts}}" wx:key="index">• {{item}}</view>
       </view>
     </view>
 
-    <view class="section" wx:if="{{primarySection.actions.whenToEscalate && primarySection.actions.whenToEscalate.length}}">
+    <view class="section" wx:if="{{vm.actionsEscalate && vm.actionsEscalate.length}}">
       <view class="section-title">何时建议线下/专家</view>
       <view class="notes">
-        <view class="note" wx:for="{{primarySection.actions.whenToEscalate}}" wx:key="index">• {{item}}</view>
+        <view class="note" wx:for="{{vm.actionsEscalate}}" wx:key="index">• {{item}}</view>
       </view>
     </view>
   </view>
 </view>
 
-<!-- Risk Section (B 辅) -->
-<view class="card" wx:if="{{riskSection}}">
-  <view class="fold-header" bindtap="toggleRisk">
-    <view class="h-title">B 辅：{{riskSection.title}}</view>
-    <view class="fold-tip">{{showRisk ? '收起' : '展开'}}</view>
+<!-- B 辅：为什么这么判断（默认折叠） -->
+<view class="card" wx:if="{{vm && vm.whyList && vm.whyList.length}}">
+  <view class="fold-header" bindtap="toggleWhy">
+    <view class="h-title">{{vm.whyTitle}}</view>
+    <view class="fold-tip">{{showWhy ? '收起' : '展开'}}</view>
   </view>
 
-  <view wx:if="{{showRisk}}">
-    <view class="tag" wx:for="{{riskSection.items}}" wx:key="key">
-      <view class="tag-head">
-        <view class="tag-name">{{item.label}}</view>
-        <view class="tag-score" wx:if="{{item.score !== undefined}}">{{item.score}}</view>
-      </view>
-
-      <view class="tag-block" wx:if="{{item.why && item.why.length}}">
-        <view class="tag-sub">为什么这么提示</view>
-        <view class="tag-li" wx:for="{{item.why}}" wx:key="index">• {{item}}</view>
-      </view>
-
-      <view class="tag-block" wx:if="{{item.prevent && item.prevent.length}}">
-        <view class="tag-sub">建议与预防</view>
-        <view class="tag-li" wx:for="{{item.prevent}}" wx:key="index">• {{item}}</view>
-      </view>
-    </view>
+  <view wx:if="{{showWhy}}" class="notes">
+    <view class="note" wx:for="{{vm.whyList}}" wx:key="index">• {{item}}</view>
   </view>
 
-  <view wx:else class="muted">
-    默认折叠：展开可查看“原因解释”和“预防建议”。
-  </view>
+  <view wx:else class="muted">默认折叠：展开可查看原因说明。</view>
 </view>
 
-<!-- Alternatives Section -->
-<view class="card" wx:if="{{alternativesSection && alternativesSection.items && alternativesSection.items.length}}">
+<!-- B 辅：可能相关原因（默认折叠） -->
+<view class="card" wx:if="{{vm && vm.possibleCauses && vm.possibleCauses.length}}">
+  <view class="fold-header" bindtap="toggleCauses">
+    <view class="h-title">{{vm.causesTitle}}</view>
+    <view class="fold-tip">{{showCauses ? '收起' : '展开'}}</view>
+  </view>
+
+  <view wx:if="{{showCauses}}" class="notes">
+    <view class="note" wx:for="{{vm.possibleCauses}}" wx:key="index">• {{item}}</view>
+  </view>
+
+  <view wx:else class="muted">默认折叠：展开可查看可能原因（供参考）。</view>
+</view>
+
+<!-- 其他可能（默认折叠，可切换查看） -->
+<view class="card" wx:if="{{pkg && pkg.alternativesSection && pkg.alternativesSection.items && pkg.alternativesSection.items.length}}">
   <view class="fold-header" bindtap="toggleAlts">
-    <view class="h-title">可能的其他情况</view>
+    <view class="h-title">其他可能情况</view>
     <view class="fold-tip">{{showAlts ? '收起' : '展开'}}</view>
   </view>
 
   <view wx:if="{{showAlts}}" class="cand-list">
     <view
       class="cand-item"
-      wx:for="{{alternativesSection.items}}"
+      wx:for="{{pkg.alternativesSection.items}}"
       wx:key="code"
       data-code="{{item.code}}"
       bindtap="onPickAlternative"
     >
       <view class="cand-left">
         <view class="cand-code">{{item.label}}</view>
-        <view class="cand-sub muted">CODE：{{item.code}}；score：{{item.score}}</view>
+        <view class="cand-sub muted">点击查看对应处理建议</view>
       </view>
-      <view class="cand-right">切换</view>
+      <view class="cand-right">查看</view>
     </view>
   </view>
 
-  <view wx:else class="muted">
-    默认折叠：展开可查看其它可能，并可点击切换查看对应方案。
-  </view>
+  <view wx:else class="muted">默认折叠：展开可查看其它可能，并可点开查看方案。</view>
 </view>
 
-<!-- Next Steps: suggested followups -->
-<view class="card" wx:if="{{nextSteps && nextSteps.suggestedFollowups && nextSteps.suggestedFollowups.length}}">
+<!-- 建议补充信息（默认折叠） -->
+<view class="card" wx:if="{{vm && vm.followups && vm.followups.length}}">
   <view class="fold-header" bindtap="toggleFollowups">
-    <view class="h-title">建议补充的信息</view>
+    <view class="h-title">{{vm.followupsTitle}}</view>
     <view class="fold-tip">{{showFollowups ? '收起' : '展开'}}</view>
   </view>
 
   <view wx:if="{{showFollowups}}" class="notes">
-    <view class="note" wx:for="{{nextSteps.suggestedFollowups}}" wx:key="index">• {{item}}</view>
+    <view class="note" wx:for="{{vm.followups}}" wx:key="index">• {{item}}</view>
   </view>
 
-  <view wx:else class="muted">
-    默认折叠：展开可查看需要补充哪些信息来提高准确度。
-  </view>
+  <view wx:else class="muted">默认折叠：展开可查看补充哪些信息更准确。</view>
 </view>
 
 <!-- Footer -->
