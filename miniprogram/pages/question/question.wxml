@@ -1,59 +1,81 @@
 <view class="page">
 
-<!-- 无题占位 -->
-<view wx:if="{{!currentQuestion}}" class="empty">
-  <text class="empty-title">正在生成下一题...</text>
-  <text class="empty-desc">如果信息不足，会自动给出初步建议</text>
-  <button class="btn" bindtap="goResult">先看初步建议</button>
+<!-- 顶部提示 -->
+<view class="hint">
+  <text class="hint-main">正在生成下一题…</text>
+  <text class="hint-sub">如果信息不足，会自动给出初步建议</text>
 </view>
 
-<!-- 有题才渲染 -->
-<view wx:elif="{{currentQuestion}}" class="card">
+<!-- 先看初步建议 -->
+<view
+  class="preview-btn"
+  wx:if="{{!loading && !currentQuestion}}"
+  bindtap="goResult"
+>
+  先看初步建议
+</view>
 
-  <view class="title">
-    <text>{{currentQuestion.title}}</text>
+<!-- 加载态 -->
+<view class="loading" wx:if="{{loading}}">
+  <text>分析中，请稍候…</text>
+</view>
+
+<!-- 问题卡片 -->
+<view class="question-card" wx:if="{{currentQuestion}}">
+
+  <!-- 问题标题 -->
+  <view class="q-title">
+    {{currentQuestion.title}}
   </view>
 
-  <view wx:if="{{currentQuestion.hint}}" class="hint">
-    <text>{{currentQuestion.hint}}</text>
+  <!-- 问题描述（可选） -->
+  <view class="q-desc" wx:if="{{currentQuestion.desc}}">
+    {{currentQuestion.desc}}
   </view>
 
   <!-- 单选题 -->
-  <view wx:if="{{currentQuestion.type === 'single'}}" class="options">
-    <block wx:for="{{currentQuestion.options}}" wx:key="value">
-      <view
-        class="option {{ selectedMap[item.value] ? 'option--selected' : '' }}"
-        data-value="{{item.value}}"
-        bindtap="onSelectOption"
-      >
-        <text>{{item.label}}</text>
+  <view wx:if="{{currentQuestion.type === 'single'}}">
+    <view
+      class="option {{selectedMap[item.value] ? 'option--active' : ''}}"
+      wx:for="{{currentQuestion.options}}"
+      wx:key="value"
+      data-value="{{item.value}}"
+      bindtap="onSelectOption"
+    >
+      <view class="opt-left">
+        <view class="radio {{selectedMap[item.value] ? 'radio--active' : ''}}"></view>
+        <text class="opt-text">{{item.label}}</text>
       </view>
-    </block>
-  </view>
-
-  <!-- 多选题 -->
-  <view wx:elif="{{currentQuestion.type === 'multi'}}" class="options">
-    <block wx:for="{{currentQuestion.options}}" wx:key="value">
-      <view
-        class="option {{ selectedMap[item.value] ? 'option--selected' : '' }}"
-        data-value="{{item.value}}"
-        bindtap="onSelectOption"
-      >
-        <text>{{item.label}}</text>
-      </view>
-    </block>
-
-    <button class="btn" bindtap="onConfirmMulti">下一步</button>
-    <view class="tip">
-      <text>提示：可选 1~2 项，选完点“下一步”。</text>
+      <view class="check" wx:if="{{selectedMap[item.value]}}">✓</view>
     </view>
   </view>
 
-  <!-- 兜底 -->
-  <view wx:else class="empty">
-    <text class="empty-title">题目类型暂不支持</text>
-    <button class="btn" bindtap="goResult">先看初步建议</button>
-  </view>
+  <!-- 多选题 -->
+  <view wx:if="{{currentQuestion.type === 'multi'}}">
+    <view
+      class="option {{selectedMap[item.value] ? 'option--active' : ''}}"
+      wx:for="{{currentQuestion.options}}"
+      wx:key="value"
+      data-value="{{item.value}}"
+      bindtap="onSelectOption"
+    >
+      <view class="opt-left">
+        <view class="checkbox {{selectedMap[item.value] ? 'checkbox--active' : ''}}">
+          <text class="checkbox-mark" wx:if="{{selectedMap[item.value]}}">✓</text>
+        </view>
+        <text class="opt-text">{{item.label}}</text>
+      </view>
+    </view>
 
+    <view class="confirm-btn" bindtap="onConfirmMulti">
+      下一步
+    </view>
+  </view>
 </view>
+
+<!-- toast -->
+<view class="toast" wx:if="{{toast}}">
+  {{toast}}
+</view>
+
 </view>

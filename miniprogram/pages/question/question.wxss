@@ -1,64 +1,137 @@
 .page {
-  padding: 16rpx 24rpx;
-}
-
-.card {
-  background: #fff;
-  border-radius: 20rpx;
   padding: 24rpx;
 }
 
-.title {
-  font-size: 34rpx;
-  font-weight: 600;
-  margin-bottom: 12rpx;
+.hint {
+  padding: 24rpx 20rpx;
 }
 
-.hint {
+.hint-main {
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.hint-sub {
+  margin-left: 10rpx;
+  color: #7a7a7a;
+  font-size: 26rpx;
+}
+
+.preview-btn {
+  margin: 18rpx 0 28rpx;
+  text-align: center;
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.loading {
+  margin-top: 30rpx;
+  color: #666;
+}
+
+.question-card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 22rpx;
+  box-shadow: 0 6rpx 18rpx rgba(0,0,0,0.06);
+}
+
+.q-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  margin-bottom: 10rpx;
+}
+
+.q-desc {
   font-size: 26rpx;
   color: #666;
-  margin-bottom: 18rpx;
-}
-
-.options {
-  margin-top: 10rpx;
+  margin-bottom: 14rpx;
 }
 
 .option {
-  padding: 22rpx 20rpx;
-  border: 2rpx solid #eee;
-  border-radius: 16rpx;
-  margin-bottom: 16rpx;
-  background: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 22rpx 18rpx;
+  margin: 16rpx 0;
+
+  border-radius: 14rpx;
+  border: 2rpx solid #e8e8e8;
+  background: #fff;
 }
 
-/* ✅ 选中态（重要） */
-.option--selected {
-  border-color: #2ecc71;
-  background: #eafff2;
+.option--active {
+  border-color: #2e7d32;
+  background: rgba(46, 125, 50, 0.06);
 }
 
-.btn {
-  margin-top: 18rpx;
+.opt-left {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
 }
 
-.tip {
-  margin-top: 10rpx;
-  color: #666;
+.opt-text {
+  font-size: 30rpx;
+  color: #111;
+}
+
+/* 单选：圆点 */
+.radio {
+  width: 26rpx;
+  height: 26rpx;
+  border-radius: 50%;
+  border: 2rpx solid #cfcfcf;
+  background: #fff;
+}
+
+.radio--active {
+  border-color: #2e7d32;
+  background: #2e7d32;
+}
+
+/* 多选：方框 */
+.checkbox {
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 6rpx;
+  border: 2rpx solid #cfcfcf;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox--active {
+  border-color: #2e7d32;
+  background: #2e7d32;
+}
+
+.checkbox-mark {
+  color: #fff;
   font-size: 24rpx;
+  line-height: 1;
 }
 
-.empty {
-  padding: 40rpx 24rpx;
+.check {
+  color: #2e7d32;
+  font-weight: 700;
+  font-size: 30rpx;
 }
 
-.empty-title {
+.confirm-btn {
+  margin-top: 20rpx;
+  padding: 22rpx 0;
+  border-radius: 14rpx;
+  text-align: center;
   font-size: 32rpx;
-  font-weight: 600;
+  font-weight: 700;
+  background: #2e7d32;
+  color: #fff;
 }
 
-.empty-desc {
-  margin-top: 12rpx;
-  color: #666;
-  font-size: 26rpx;
+.toast {
+  margin-top: 20rpx;
+  color: #d32f2f;
 }
