@@ -1,165 +1,206 @@
 /**
  * miniprogram/domain/assembly/assembleDiagnosisPackage.js
  * --------------------------------------------------
- * 第四层：诊断整合层（Diagnosis Assembly）
- *
- * assemble(answers, diagnosisResult, libraries, options) -> DiagnosisPackage
+ * ✅ 修复：
+ * - 不再把 LEAF_SOOTY_MOLD 这类 code 直接显示给用户
+ * - solutions 没 title 时，用内置 code->中文映射兜底
+ * - nextSteps 字段稳定输出
  */
 
-const generic = require('./genericFallback');
+const pkgVersion = 'v_mvp_followup_3';
 
-/* ===== 原有工具函数：全部保留 ===== */
-function nowISO() {
-  try { return new Date().toISOString(); } catch (e) { return String(Date.now()); }
-}
+const CODE_TO_CN = {
+  LEAF_YELLOWING: '叶片发黄（黄化）',
+  LEAF_SPOTS: '叶片斑点',
+  LEAF_SOOTY_MOLD: '叶片煤污（黑灰霉层）',
+
+  FRUIT_CRACKING: '裂果',
+  FRUIT_SPOTS: '果面斑点',
+
+  BRANCH_GUMMING: '枝条流胶',
+  ROOT_ROT_RISK: '烂根/根腐风险'
+};
+
 function toNum(v, d = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : d;
 }
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
-}
 function uniq(arr) {
-  return Array.from(new Set((arr || []).filter(Boolean)));
+  const a = Array.isArray(arr) ? arr : [];
+  return Array.from(new Set(a.filter(Boolean)));
 }
-function asArray(v) {
-  if (Array.isArray(v)) return v;
-  if (v === undefined || v === null) return [];
-  return [v];
+function safeArray(v) {
+  return Array.isArray(v) ? v : [];
 }
-function countAnsweredKeys(answers = {}) {
-  let c = 0;
-  Object.keys(answers || {}).forEach(k => {
-    const v = answers[k];
-    if (v === undefined || v === null) return;
-    if (typeof v === 'string' && v.trim() === '') return;
-    if (Array.isArray(v) && v.length === 0) return;
-    c += 1;
-  });
-  return c;
+function safeObj(v) {
+  return v && typeof v === 'object' ? v : {};
 }
-function confidenceLevel(score01) {
-  const s = toNum(score01, 0);
+function scoreToConfidenceLevel(score) {
+  const s = toNum(score, 0);
   if (s >= 0.80) return 'HIGH';
   if (s >= 0.65) return 'MEDIUM';
   return 'LOW';
 }
+function pickTopEvidence(evidence = [], limit = 3) {
+  const list = safeArray(evidence).slice();
+  list.sort((a, b) => Math.abs(toNum(b.impact, 0)) - Math.abs(toNum(a.impact, 0)));
+  return list.slice(0, limit);
+}
 
-/* ===== assemble 主函数 ===== */
-function assemble(answers = {}, diagnosisResult = {}, libraries = {}, options = {}) {
-  const pkgVersion = options.packageVersion || '1.0.0';
-  const generatedAt = nowISO();
+// ✅ 永不把 UNKNOWN/code 生硬露给用户
+function labelForCode(code, solutionsLib) {
+  const lib = safeObj(solutionsLib);
+  const c = String(code || '').trim();
+  const s = c ? lib[c] : null;
 
-  const solutionsLib = libraries.solutions;
-  const expertDictionary = libraries.expertDictionary || {};
-  const treatmentPlans = libraries.treatmentPlans || {};
-  const uiCopy = libraries.uiCopy || {};
+  if (s && s.title) return String(s.title);
+  if (c && CODE_TO_CN[c]) return CODE_TO_CN[c];
 
-  const crop = answers.crop || diagnosisResult.meta?.crop || 'citrus';
+  // 不返回 UNKNOWN
+  if (!c) return '问题待进一步确认';
+  return '问题待进一步确认';
+}
 
-  /* ---------- 原有 primary / alternatives / risk / qualityFlags 逻辑（不动） ---------- */
+function buildSuggestedFollowups({ followupKeys, needMore }) {
+  const fk = safeArray(followupKeys);
+  const nm = safeArray(needMore);
+  if (fk.length === 0 && nm.length === 0) return [];
+  return ['还需要补充少量信息，才能给出更准确判断。'];
+}
 
-  const candidates = Array.isArray(diagnosisResult.candidates)
-    ? diagnosisResult.candidates.slice()
-    : [];
+function buildPrimarySection({ primary, solutionsLib }) {
+  const p = safeObj(primary);
+  const code = p.code ? String(p.code) : '';
+  const score = toNum(p.score, 0);
 
-  candidates.sort((a, b) => toNum(b.score, 0) - toNum(a.score, 0));
+  const solution = code ? safeObj(safeObj(solutionsLib)[code]) : {};
+  const actions = solution && solution.actions ? solution.actions : null;
 
-  const top1 = candidates[0] || { code: diagnosisResult.code || 'UNKNOWN', score: 0 };
-  const top2 = candidates[1] || null;
+  const cn = labelForCode(code, solutionsLib);
 
-  const primary = {
-    code: top1.code || 'UNKNOWN',
-    score: clamp(toNum(top1.score, 0), 0, 1),
-    evidence: asArray(diagnosisResult.evidence).slice(0, 3)
+  return {
+    code,
+    title: cn,
+    displayName: cn,
+    score,
+    confidenceLevel: scoreToConfidenceLevel(score),
+    evidence: pickTopEvidence(p.evidence || [], 3),
+    actions: actions || null,
+  };
+}
+
+function buildSummary({ primarySection }) {
+  const p = safeObj(primarySection);
+  return {
+    headline: p.title || '问题待进一步确认',
+    subline: '判断情况：还需要进一步确认'
+  };
+}
+
+function buildQualityFlags({ diagnosisResult }) {
+  const dr = safeObj(diagnosisResult);
+  const flags = safeArray(dr.qualityFlags).map(String);
+  const missing = safeArray(safeObj(dr.meta).missingKeys);
+  if (missing.length > 0) flags.push('INFO_INSUFFICIENT');
+  return uniq(flags);
+}
+
+function buildAlternativesSection({ alternatives, solutionsLib, maxItems = 2 }) {
+  const list = safeArray(alternatives).slice(0, maxItems).map(a => {
+    const code = a && a.code ? String(a.code) : '';
+    const score = toNum(a && a.score, 0);
+    const title = labelForCode(code, solutionsLib);
+    const s = safeObj(safeObj(solutionsLib)[code]);
+    return { code, title, score, actions: s.actions || null };
+  });
+
+  return { title: '其他可能情况', items: list };
+}
+
+function buildFollowupKeys({ answers, diagnosisResult, primaryCode }) {
+  const dr = safeObj(diagnosisResult);
+  const meta = safeObj(dr.meta);
+  const ns = safeObj(dr.nextSteps);
+
+  const direct = safeArray(dr.needMoreKeys)
+    .concat(safeArray(ns.followupKeys))
+    .map(String);
+
+  const missing = safeArray(meta.missingKeys).map(String);
+
+  let keys = uniq(direct.concat(missing));
+
+  // 裂果 MVP 兜底
+  if (primaryCode === 'FRUIT_CRACKING') {
+    const a = safeObj(answers);
+    const want = [];
+    if (a.FRUIT_CRACKING_WATER_SWING === undefined && a.Q_FRUIT_CRACKING_WATER_SWING === undefined) want.push('FRUIT_CRACKING_WATER_SWING');
+    if (a.FRUIT_CRACKING_CRACK_SHAPE === undefined && a.Q_FRUIT_CRACKING_CRACK_SHAPE === undefined) want.push('FRUIT_CRACKING_CRACK_SHAPE');
+    if (a.FRUIT_CRACKING_RATE === undefined && a.Q_FRUIT_CRACKING_RATE === undefined) want.push('FRUIT_CRACKING_RATE');
+    keys = uniq(keys.concat(want));
+  }
+
+  return keys;
+}
+
+function buildNeedMoreFromFollowupKeys(followupKeys) {
+  return safeArray(followupKeys).map(k => ({
+    key: String(k),
+    reason: '需要补充信息以提高判断准确度'
+  }));
+}
+
+function assemble(answers, diagnosisResult, libraries = {}, options = {}) {
+  const libs = safeObj(libraries);
+  const solutionsLib = safeObj(libs.solutions);
+
+  const dr = safeObj(diagnosisResult);
+  const primary = safeObj(dr.primary);
+  const alternatives = safeArray(dr.alternatives);
+
+  const generatedAt = new Date().toISOString();
+
+  const primarySection = buildPrimarySection({ primary, solutionsLib });
+  const summary = buildSummary({ primarySection });
+  const qualityFlags = buildQualityFlags({ diagnosisResult: dr });
+
+  const followupKeys = buildFollowupKeys({
+    answers: safeObj(answers),
+    diagnosisResult: dr,
+    primaryCode: primarySection.code
+  });
+
+  const needMore = buildNeedMoreFromFollowupKeys(followupKeys);
+
+  const nextSteps = {
+    followupKeys: safeArray(followupKeys),
+    needMore: safeArray(needMore),
+    suggestedFollowups: buildSuggestedFollowups({ followupKeys, needMore })
   };
 
-  const alternatives = candidates.slice(1, 3).map(c => ({
-    code: c.code,
-    score: clamp(toNum(c.score, 0), 0, 1)
-  }));
+  const alternativesSection = buildAlternativesSection({
+    alternatives,
+    solutionsLib,
+    maxItems: 2
+  });
 
-  const riskTags = Array.isArray(diagnosisResult.riskTags)
-    ? diagnosisResult.riskTags.slice(0, 2)
-    : [];
-
-  const level = confidenceLevel(primary.score);
-
-  const qualityFlags = [];
-  const answeredKeyCount = countAnsweredKeys(answers);
-  const evCount = asArray(diagnosisResult.evidence).length;
-
-  if (primary.score < 0.65 || answeredKeyCount < 4 || evCount < 1) {
-    qualityFlags.push('INFO_INSUFFICIENT');
-  }
-
-  if (top2 && (primary.score - clamp(toNum(top2.score, 0), 0, 1) < 0.10)) {
-    qualityFlags.push('CONFLICTING_SIGNALS');
-  }
-
-  /* ===================== ★ 新增：结构化追问缺口 ===================== */
-
-  const followupKeys = [];
-
-  if (qualityFlags.includes('INFO_INSUFFICIENT')) {
-    // MVP：按主诊断 code 决定追问缺口
-    if (primary.code === 'FRUIT_CRACKING') {
-      followupKeys.push(
-        'FRUIT_CRACKING_WATER_SWING',
-        'FRUIT_CRACKING_SHAPE'
-      );
-    }
-    // 后续你可以继续加：
-    // if (primary.code === 'LEAF_YELLOWING') ...
-  }
-
-  const nextSteps =
-    followupKeys.length > 0
-      ? {
-          followupKeys: uniq(followupKeys),
-          // UI 仍然可以用你原有 suggestedFollowups
-          suggestedFollowups: buildSuggestedFollowups(answers, primary.code)
-        }
-      : undefined;
-
-  /* ---------- 返回结构（只是在原结构上多透传 nextSteps） ---------- */
+  const answeredKeyCount = Object.keys(safeObj(answers)).length;
+  const level = scoreToConfidenceLevel(primarySection.score);
 
   return {
     meta: {
       packageVersion: pkgVersion,
       generatedAt,
       confidenceLevel: level,
-      primaryScore: primary.score,
+      primaryScore: primarySection.score,
       answeredKeyCount,
-      qualityFlags: uniq(qualityFlags)
+      qualityFlags
     },
-
-    summary: {
-      headline: `你遇到的可能是：${primary.code}`,
-      subhead: level === 'LOW'
-        ? '建议补充关键信息后再确认，会更准确。'
-        : '建议按下面步骤处理。'
-    },
-
-    primarySection: {
-      title: primary.code,
-      code: primary.code,
-      score: primary.score,
-      evidence: primary.evidence
-    },
-
-    riskSection: {
-      title: '可能的原因与预防（建议看看）',
-      defaultCollapsed: true,
-      items: riskTags
-    },
-
-    alternativesSection: {
-      defaultCollapsed: true,
-      items: alternatives
-    },
-
-    ...(nextSteps ? { nextSteps } : {})
+    summary,
+    primarySection,
+    riskSection: dr.riskSection || { title: '风险提示', items: [] },
+    alternativesSection,
+    nextSteps
   };
 }
 

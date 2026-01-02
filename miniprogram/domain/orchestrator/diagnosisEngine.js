@@ -1,115 +1,135 @@
 /**
- * diagnosisEngine.js
+ * miniprogram/domain/orchestrator/diagnosisEngine.js
  * --------------------------------------------------
- * 算法调度总入口（Algorithm Orchestrator）
- *
- * 最小增强：
- * - 输出结构化 needMoreKeys（不给 UI，不调度，只声明“缺什么”）
+ * ✅ 修复：
+ * - 兼容 candidate.score / candidate.score.score / candidate.finalScore / candidate.confidence 等多种结构
+ * - 强制补齐 report.primary / alternatives
+ * - 保持兼容：仍输出 report.code / candidates / riskTags / evidence / meta / needMoreKeys
  */
 
 const primaryScoreEngine = require('../algorithms/primaryScoreEngine');
 const riskTagger = require('../algorithms/riskTagger');
 
-/**
- * 统一入口
- * @param {Object} answers - 问卷答案
- * @returns {Object} report
- */
-function run(answers = {}) {
-  const startTime = Date.now();
+function toNum(v, d = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : d;
+}
 
-  // ---------- 基础上下文 ----------
+function pickScore(c) {
+  if (!c) return 0;
+
+  // 最常见：score 是 number
+  if (typeof c.score === 'number') return toNum(c.score, 0);
+
+  // 兼容：score 是对象，如 { score: 0.72 }
+  if (c.score && typeof c.score === 'object') {
+    if (typeof c.score.score === 'number') return toNum(c.score.score, 0);
+    if (typeof c.score.value === 'number') return toNum(c.score.value, 0);
+  }
+
+  // 兼容：finalScore / confidence
+  if (typeof c.finalScore === 'number') return toNum(c.finalScore, 0);
+  if (typeof c.confidence === 'number') return toNum(c.confidence, 0);
+
+  // 兼容：result.score
+  if (c.result && typeof c.result === 'object') {
+    if (typeof c.result.score === 'number') return toNum(c.result.score, 0);
+  }
+
+  return 0;
+}
+
+function pickEvidence(c) {
+  if (!c) return [];
+  if (Array.isArray(c.evidence)) return c.evidence;
+  if (c.result && Array.isArray(c.result.evidence)) return c.result.evidence;
+  return [];
+}
+
+function run(answers = {}) {
   const context = {
     crop: answers.crop || 'citrus',
-    positions: Array.isArray(answers.positions)
-      ? answers.positions
-      : (answers.position ? [answers.position] : []),
-    month: answers.month || (new Date().getMonth() + 1),
+    month: toNum(answers.month, 0),
+    positions: Array.isArray(answers.positions) ? answers.positions : [],
   };
 
-  // ---------- A 主：Primary Diagnosis ----------
-  const primaryResult = primaryScoreEngine.run({
+  // A) 主：候选评分
+  const primaryResult = primaryScoreEngine.run({ answers, context }) || {};
+  const rawCandidates = Array.isArray(primaryResult.candidates) ? primaryResult.candidates : [];
+
+  // 统一成 {code, score, evidence, raw}
+  const normCandidates = rawCandidates.map(c => ({
+    code: String(c?.code || ''),
+    score: pickScore(c),
+    evidence: pickEvidence(c),
+    raw: c
+  }));
+
+  normCandidates.sort((a, b) => (toNum(b.score) - toNum(a.score)));
+
+  const top = normCandidates[0] || null;
+
+  const primary = top
+    ? { code: top.code, score: toNum(top.score), evidence: top.evidence }
+    : { code: '', score: 0, evidence: [] };
+
+  const alternatives = normCandidates.slice(1, 3).map(x => ({
+    code: x.code,
+    score: toNum(x.score),
+    evidence: x.evidence
+  }));
+
+  // B) 风险标签
+  const risk = riskTagger.run({
     answers,
-    context,
-  });
+    primaryCode: top ? top.code : null,
+    context
+  }) || {};
 
-  const candidates = Array.isArray(primaryResult.candidates)
-    ? primaryResult.candidates
-    : [];
-
-  const sortedCandidates = candidates
-    .slice()
-    .sort((a, b) => (b.score || 0) - (a.score || 0));
-
-  const topCandidate = sortedCandidates[0] || null;
-
-  // ---------- B 辅：Risk Tags ----------
-  const riskTags = riskTagger.run({
-    answers,
-    primaryCode: topCandidate ? topCandidate.code : null,
-    context,
-  });
-
-  // ---------- 汇总 evidence ----------
   const evidence = []
-    .concat(primaryResult.evidence || [])
-    .concat(riskTags.evidence || []);
+    .concat(Array.isArray(primaryResult.evidence) ? primaryResult.evidence : [])
+    .concat(Array.isArray(risk.evidence) ? risk.evidence : []);
 
-  // ---------- Meta ----------
   const meta = {
     crop: context.crop,
     positions: context.positions,
     month: context.month,
-
-    elapsedMs: Date.now() - startTime,
-
-    scoreCap: primaryResult.meta?.scoreCap,
-    missingKeys: primaryResult.meta?.missingKeys || [],
+    ...(primaryResult.meta ? { primaryMeta: primaryResult.meta } : {}),
   };
 
-  /**
-   * ===============================
-   * ★ 最小增强：结构化缺口声明
-   * ===============================
-   */
+  // 缺口 keys
   let needMoreKeys = [];
-
-  // 1️⃣ primary 引擎已经明确声明缺口（最优）
-  if (Array.isArray(primaryResult.meta?.missingKeys) && primaryResult.meta.missingKeys.length > 0) {
+  if (Array.isArray(primaryResult?.meta?.missingKeys) && primaryResult.meta.missingKeys.length > 0) {
     needMoreKeys = primaryResult.meta.missingKeys.slice();
-  }
-
-  // 2️⃣ 否则：基于病种 + 不确定性，做一次最小兜底
-  if (needMoreKeys.length === 0) {
-    const score = topCandidate ? Number(topCandidate.score || 0) : 0;
-
-    if (score < 0.65 && topCandidate?.code === 'FRUIT_CRACKING') {
-      needMoreKeys.push(
+  } else {
+    // MVP：裂果追问兜底（不影响叶子类）
+    if (primary.code === 'FRUIT_CRACKING' && primary.score < 0.65) {
+      needMoreKeys = [
         'FRUIT_CRACKING_WATER_SWING',
-        'FRUIT_CRACKING_SHAPE'
-      );
+        'FRUIT_CRACKING_CRACK_SHAPE',
+        'FRUIT_CRACKING_RATE'
+      ];
     }
   }
 
-  // ---------- 输出 report ----------
   return {
-    code: topCandidate ? topCandidate.code : '',
+    // 兼容旧字段
+    code: primary.code,
 
-    candidates: sortedCandidates.map(c => ({
-      code: c.code,
-      score: Number(c.score || 0),
-    })),
+    // ✅ 必有 primary
+    primary,
 
-    riskTags: Array.isArray(riskTags.tags) ? riskTags.tags : [],
+    // ✅ alternatives
+    alternatives,
 
+    // ✅ candidates：仍给最简 {code, score}
+    candidates: normCandidates.map(x => ({ code: x.code, score: toNum(x.score) })),
+
+    riskTags: Array.isArray(risk.tags) ? risk.tags : [],
     evidence,
     meta,
-
-    // ★ 新增字段（稳定，不影响现有调用）
     needMoreKeys,
   };
 }
 
-module.exports = {
-  run,
-};
+module.exports = { run };

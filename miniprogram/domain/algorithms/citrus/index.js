@@ -1,100 +1,69 @@
-function safeRequire(path) {
+/**
+ * miniprogram/domain/algorithms/citrus/index.js
+ * ✅ 可直接替换版
+ *
+ * 关键修复：不要把 require() 包在函数里（动态 require 会导致小程序打包器漏收子模块，
+ * 运行时报：module '.../leaf/index.js' is not defined）。
+ */
+
+function normalizeAnswers(answers = {}) {
+  const crop = answers.crop || answers.cropKey || answers.crop_code || answers.cropCode;
+  const month = answers.month || answers.monthNum || answers.month_no || answers.monthNo;
+
+  const positionsRaw = answers.positions || answers.position || answers.parts || answers.part;
+  const positions = Array.isArray(positionsRaw) ? positionsRaw : (positionsRaw ? [positionsRaw] : []);
+
+  return { ...answers, crop, month, positions };
+}
+
+// --- 静态 require：必须保持字面量字符串 ---
+let leaf = null;
+let fruit = null;
+let branch = null;
+let root = null;
+
+try { leaf = require('./leaf/index.js'); } catch (e) { console.warn('[citrus/index] require failed: ./leaf/index.js', e); }
+try { fruit = require('./fruit/index.js'); } catch (e) { console.warn('[citrus/index] require failed: ./fruit/index.js', e); }
+try { branch = require('./branch/index.js'); } catch (e) { console.warn('[citrus/index] require failed: ./branch/index.js', e); }
+try { root = require('./root/index.js'); } catch (e) { console.warn('[citrus/index] require failed: ./root/index.js', e); }
+
+function runModule(mod, ctx) {
+  if (!mod) return null;
   try {
-    return require(path);
+    if (typeof mod === 'function') return mod(ctx);
+    if (typeof mod.run === 'function') return mod.run(ctx);
+    if (typeof mod.diagnose === 'function') return mod.diagnose(ctx);
+    return null;
   } catch (e) {
-    console.warn('[citrus/index] require failed:', path, e && (e.message || e));
+    console.warn('[citrus/index] run module failed:', e);
     return null;
   }
 }
 
-const leaf = safeRequire('./leaf/index.js');
-const fruit = safeRequire('./fruit/index.js');
-const branch = safeRequire('./branch/index.js');
-const root = safeRequire('./root/index.js');
+/**
+ * 统一入口：返回单一部位时返回该部位结果；多部位时返回 {positions:[...]}
+ */
+function diagnose(answers = {}, ctx = {}) {
+  const a = normalizeAnswers(answers);
+  const posArr = Array.isArray(a.positions) ? a.positions : [];
+  const positions = posArr.length ? posArr : ['leaf']; // 默认 leaf
 
-// ✅ 关键：在算法入口统一做口径映射（不依赖问卷层/结果页传参）
-function normalizeAnswersForAlgo(uiAnswers = {}) {
-  const a = { ...uiAnswers };
-
-  // 1) symptoms 映射：问卷层 -> 算法层命中词
-  const s = Array.isArray(a.symptoms) ? a.symptoms.slice() : [];
-  const has = (v) => s.indexOf(v) >= 0;
-
-  // 煤污线路：leaf_sooty -> honeydew（sooty_mold.js 用的是 honeydew）
-  if (has('leaf_sooty') && !has('honeydew')) s.push('honeydew');
-
-  // 根腐风险：root_vigor -> root_rot（root_rot.js 用 root_rot）
-  if (has('root_vigor') && !has('root_rot')) s.push('root_rot');
-
-  a.symptoms = s;
-
-  // 2) yes/no/unknown -> true/false/unknown（规则里判断 insects_visible === true/false）
-  const ynToBool = (v) => {
-    if (v === 'yes') return true;
-    if (v === 'no') return false;
-    return v; // unknown / undefined 原样保留
-  };
-
-  if (a.insects_visible !== undefined) a.insects_visible = ynToBool(a.insects_visible);
-  if (a.soil_waterlog !== undefined) a.soil_waterlog = ynToBool(a.soil_waterlog);
-
-  return a;
-}
-
-function normalizeRes(res) {
-  if (!res) return { candidates: [] };
-
-  if (Array.isArray(res.candidates)) {
-    return { candidates: res.candidates };
-  }
-
-  if (res.best) {
-    const code = res.best.code || res.best.id || res.best;
-    const score = Number(res.confidence) || Number(res.best.score) || 0;
-    return {
-      candidates: [{
-        code,
-        score,
-        evidence: res.best.evidence || [],
-        suggestions: res.best.suggestions || [],
-        needs: res.best.needs || []
-      }]
-    };
-  }
-
-  return { candidates: [] };
-}
-
-function mergeCandidates(list) {
   const out = [];
-  (list || []).forEach(item => {
-    const r = normalizeRes(item);
-    if (r && Array.isArray(r.candidates)) out.push(...r.candidates);
+  positions.forEach((pos) => {
+    const moduleCtx = { ...ctx, answers: a, position: pos };
+    let res = null;
+
+    if (pos === 'leaf') res = runModule(leaf, moduleCtx);
+    else if (pos === 'fruit') res = runModule(fruit, moduleCtx);
+    else if (pos === 'branch') res = runModule(branch, moduleCtx);
+    else if (pos === 'root') res = runModule(root, moduleCtx);
+    else res = runModule(leaf, moduleCtx);
+
+    if (res) out.push({ position: pos, ...res });
   });
 
-  out.forEach(c => { c.score = Number(c.score) || 0; });
-  out.sort((a, b) => (b.score || 0) - (a.score || 0));
-  return out;
+  if (out.length === 1) return out[0];
+  return { positions: out };
 }
 
-module.exports = function runCitrus(ctx) {
-  const inAnswers = (ctx && ctx.answers) ? ctx.answers : {};
-  const answers = normalizeAnswersForAlgo(inAnswers);
-
-  const positions = Array.isArray(answers.positions) ? answers.positions : [];
-
-  const nextCtx = { ...ctx, answers };
-
-  const parts = [];
-  if (positions.length === 0) {
-    if (leaf) parts.push(leaf(nextCtx));
-  } else {
-    if (positions.includes('leaf') && leaf) parts.push(leaf(nextCtx));
-    if (positions.includes('fruit') && fruit) parts.push(fruit(nextCtx));
-    if (positions.includes('branch') && branch) parts.push(branch(nextCtx));
-    if (positions.includes('root') && root) parts.push(root(nextCtx));
-  }
-
-  const candidates = mergeCandidates(parts);
-  return { candidates };
-};
+module.exports = { diagnose };

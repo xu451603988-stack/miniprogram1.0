@@ -1,50 +1,57 @@
-// miniprogram/domain/diagnosisEngine.js
-const expertDictionary = require('./dictionary/expertDictionary');
-const treatmentPlans = require('./plans/treatmentPlans');
+/**
+ * miniprogram/domain/diagnosisEngine.js
+ *
+ * ✅ 兼容层：把历史上的 run(answers) / run({answers}) 统一转发到 orchestrator 引擎
+ * 目的：
+ * - 避免旧实现把 citrusAlgo 当函数调用导致 TypeError（旧实现见 :contentReference[oaicite:1]{index=1}）
+ * - 让全链路输出结构统一（question/result 都走 orchestrator）
+ *
+ * 注意：
+ * - 新工程建议直接在页面层 require('../../domain/orchestrator/diagnosisEngine')
+ * - 这里保留是为了兼容历史引用，避免“删了就炸”
+ */
 
-// 你的算法入口（你现在用的是 citrus/index.js）
-const citrusAlgo = require('./algorithms/citrus'); // 这里是 require('../algorithms/citrus') 那种的话就保持一致
+const orchestrator = require('./orchestrator/diagnosisEngine');
 
-function pick(obj, key, fallback = null) {
-  return (obj && obj[key]) ? obj[key] : fallback;
+/** 兼容：把 run(answers) / run({answers}) 都规范成 { answers } */
+function normalizePayload(input) {
+  // run({ answers })
+  if (input && typeof input === 'object' && !Array.isArray(input) && input.answers) {
+    return input;
+  }
+
+  // run(answers) 其中 answers 常常是对象
+  if (input && typeof input === 'object') {
+    return { answers: input };
+  }
+
+  // 兜底
+  return { answers: {} };
 }
 
 module.exports = {
   /**
-   * answers: question页收集的 answers（可能包含 orchard / symptoms / environment / management...）
-   * returns: { syndromeKey, confidence, reasons, dictionary, plans }
+   * 兼容旧签名：run(answers) / run({answers, crop, ...})
+   * 返回：orchestrator.run 的 report（由 assembly 再转 UI 包）
    */
-  run(answers = {}) {
-    // 1) 算法先跑出 syndromeKey（证型键）
-    const algoRes = citrusAlgo.evaluate ? citrusAlgo.evaluate(answers) : citrusAlgo(answers);
+  run(input = {}) {
+    const payload = normalizePayload(input);
 
-    const syndromeKey = algoRes.syndromeKey || algoRes.syndrome || 'nutrition_imbalance';
-    const confidence = Number(algoRes.confidence || 0.6);
-    const reasons = algoRes.reasons || algoRes.details || [];
-
-    // 2) 查词典（专家辩证）
-    const dict = pick(expertDictionary, syndromeKey, {
-      name: "未收录证型",
-      brief: "该证型暂未在词典库中配置。",
-      expertPoints: [],
-      commonTriggers: [],
-      typicalSigns: []
-    });
-
-    // 3) 查方案（病/虫/肥三条线）
-    const plans = pick(treatmentPlans, syndromeKey, {
-      disease: [],
-      pest: [],
-      nutrition: []
-    });
-
-    return {
-      syndromeKey,
-      syndromeName: dict.name || syndromeKey,
-      confidence,
-      reasons,
-      dictionary: dict,
-      plans
-    };
+    // 优先使用新签名 orchestrator.run({answers,...})
+    try {
+      return orchestrator.run(payload);
+    } catch (e1) {
+      // 兼容极少数旧 orchestrator：run(answers)
+      try {
+        return orchestrator.run(payload.answers);
+      } catch (e2) {
+        // 保留更可读的报错信息
+        const err = new Error(
+          `[diagnosisEngine] orchestrator.run failed: ${e2 && e2.message ? e2.message : String(e2)}`
+        );
+        err.cause = e2;
+        throw err;
+      }
+    }
   }
 };

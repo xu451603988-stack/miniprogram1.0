@@ -1,26 +1,50 @@
 /**
  * questionBank.js
- *
- * 职责：
- * - questionId / followupKey -> 题面配置
- * - 保证 scheduler 返回的 questionId 一定能取到题
- *
- * MVP 约定：
- * - followupKey === questionId
- * - 若取不到题，页面层负责兜底结束
+ * ✅ 修复：补齐 leaf_color / leaf_shape / start 三道基础题
+ * 同时保留裂果追问题
  */
 
-/**
- * ===== 题库主体 =====
- * key = questionId = followupKey
- */
 const QUESTION_BANK = {
-  /**
-   * ========================
-   * 裂果（FRUIT_CRACKING）追问（MVP）
-   * ========================
-   */
+  // ===== 基础问卷（必须有，否则 missingKeys 也问不了）=====
+  leaf_color: {
+    id: 'leaf_color',
+    key: 'leaf_color',
+    type: 'multi',
+    title: '叶片颜色/表面更接近哪种情况？（可多选）',
+    options: [
+      { label: '叶脉绿、叶肉发黄', value: 'vein_green_leaf_yellow' },
+      { label: '叶面有黑灰色霉层/煤烟状', value: 'sooty_layer' },
+      { label: '伴随红蜘蛛/刺吸为害迹象（黄白斑、细网等）', value: 'red_spider_symptoms' },
+      { label: '说不清/不确定', value: 'unknown' }
+    ]
+  },
 
+  leaf_shape: {
+    id: 'leaf_shape',
+    key: 'leaf_shape',
+    type: 'multi',
+    title: '叶片形态更接近哪种情况？（可多选）',
+    options: [
+      { label: '叶片向背面卷曲（反卷）', value: 'leaf_curled_back' },
+      { label: '叶片变小、畸形或皱缩', value: 'leaf_small_deformed' },
+      { label: '叶片有斑点/斑块', value: 'leaf_spot_like' },
+      { label: '说不清/不确定', value: 'unknown' }
+    ]
+  },
+
+  start: {
+    id: 'start',
+    key: 'start',
+    type: 'single',
+    title: '症状更像从哪里开始出现？',
+    options: [
+      { label: '整树势弱/新梢偏弱', value: 'tree_weak' },
+      { label: '局部枝条或局部区域', value: 'local_branch' },
+      { label: '不确定', value: 'unknown' }
+    ]
+  },
+
+  // ===== 裂果追问（你原本就有）=====
   FRUIT_CRACKING_WATER_SWING: {
     id: 'FRUIT_CRACKING_WATER_SWING',
     key: 'fruit_cracking_water_swing',
@@ -58,35 +82,15 @@ const QUESTION_BANK = {
       { label: '不确定', value: 'unknown' }
     ]
   }
-
-  /**
-   * ========================
-   * 后续病种在这里继续追加
-   * ========================
-   */
 };
 
-/**
- * 根据 questionId 取题
- *
- * @param {string} questionId
- * @param {Object} ctx 可选上下文（MVP 暂不使用）
- * @returns {Object|null}
- */
-function getQuestion(questionId, ctx = {}) {
+function getQuestion(questionId) {
   if (!questionId) return null;
   return QUESTION_BANK[questionId] || null;
 }
 
-/**
- * 可选：暴露所有 questionId
- * 用于开发期校验（rules / followupKeys 是否闭环）
- */
 function listAllQuestionIds() {
   return Object.keys(QUESTION_BANK);
 }
 
-module.exports = {
-  getQuestion,
-  listAllQuestionIds
-};
+module.exports = { getQuestion, listAllQuestionIds };
