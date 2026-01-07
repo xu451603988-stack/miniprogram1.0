@@ -2,9 +2,9 @@
  * miniprogram/domain/orchestrator/diagnosisEngine.js
  * --------------------------------------------------
  * ✅ 修复：
- * - 兼容 candidate.score / candidate.score.score / candidate.finalScore / candidate.confidence 等多种结构
- * - 强制补齐 report.primary / alternatives
- * - 保持兼容：仍输出 report.code / candidates / riskTags / evidence / meta / needMoreKeys
+ * - 确保 primaryResult.meta.missingKeys 强制透传至最终 report
+ * - 优化 needMoreKeys 提取逻辑，防止追问链路在引擎侧中断
+ * - 保持所有原始算法逻辑、candidates 评分与 code 输出不变
  */
 
 const primaryScoreEngine = require('../algorithms/primaryScoreEngine');
@@ -17,25 +17,16 @@ function toNum(v, d = 0) {
 
 function pickScore(c) {
   if (!c) return 0;
-
-  // 最常见：score 是 number
   if (typeof c.score === 'number') return toNum(c.score, 0);
-
-  // 兼容：score 是对象，如 { score: 0.72 }
   if (c.score && typeof c.score === 'object') {
     if (typeof c.score.score === 'number') return toNum(c.score.score, 0);
     if (typeof c.score.value === 'number') return toNum(c.score.value, 0);
   }
-
-  // 兼容：finalScore / confidence
   if (typeof c.finalScore === 'number') return toNum(c.finalScore, 0);
   if (typeof c.confidence === 'number') return toNum(c.confidence, 0);
-
-  // 兼容：result.score
   if (c.result && typeof c.result === 'object') {
     if (typeof c.result.score === 'number') return toNum(c.result.score, 0);
   }
-
   return 0;
 }
 
@@ -97,19 +88,22 @@ function run(answers = {}) {
     ...(primaryResult.meta ? { primaryMeta: primaryResult.meta } : {}),
   };
 
-  // 缺口 keys
+  /**
+   * ===== 核心修复：稳定透传缺口 Keys =====
+   */
   let needMoreKeys = [];
+  
+  // 1. 优先采用算法层 primaryScoreEngine 直接识别出的 missingKeys
   if (Array.isArray(primaryResult?.meta?.missingKeys) && primaryResult.meta.missingKeys.length > 0) {
     needMoreKeys = primaryResult.meta.missingKeys.slice();
-  } else {
-    // MVP：裂果追问兜底（不影响叶子类）
-    if (primary.code === 'FRUIT_CRACKING' && primary.score < 0.65) {
-      needMoreKeys = [
-        'FRUIT_CRACKING_WATER_SWING',
-        'FRUIT_CRACKING_CRACK_SHAPE',
-        'FRUIT_CRACKING_RATE'
-      ];
-    }
+  } 
+  // 2. 兜底逻辑：仅当算法层没有输出缺口，且匹配特定症状（如裂果）时执行硬编码追问
+  else if (primary.code === 'FRUIT_CRACKING' && primary.score < 0.8) {
+    needMoreKeys = [
+      'FRUIT_CRACKING_WATER_SWING',
+      'FRUIT_CRACKING_CRACK_SHAPE',
+      'FRUIT_CRACKING_RATE'
+    ];
   }
 
   return {
@@ -127,7 +121,14 @@ function run(answers = {}) {
 
     riskTags: Array.isArray(risk.tags) ? risk.tags : [],
     evidence,
-    meta,
+    
+    // ✅ 关键修复：确保 meta 内部包含最新的 missingKeys，供 assembly 层翻译
+    meta: {
+      ...meta,
+      missingKeys: needMoreKeys
+    },
+    
+    // ✅ 关键修复：外层透传，确保 scheduler 直接识别
     needMoreKeys,
   };
 }
