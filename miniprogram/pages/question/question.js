@@ -1,207 +1,254 @@
 /**
- * pages/question/question.js
- * ✅ 关键修复：
- * - assembly.assemble 的正确签名：assemble(answers, diagnosisResult, libraries)
- * - 传入 libraries（solutions/expertDictionary/treatmentPlans），让方案 steps 不为空
- * - scheduler 只依赖 followupKeys/needMore：必须从 assembly.nextSteps 得到这些
+ * miniprogram/pages/question/question.js
+ *
+ * 目标：
+ * 1) 不依赖 createBaseCursor（你当前 scheduler 没这个 API）
+ * 2) 进入页面立即：engine.run -> assemble -> scheduler 出第一题
+ * 3) commitAnswer：单选 string，多选 array（防止 ["xxx"] 导致规则永远不命中）
+ * 4) 所有 require 必须是字面量 + try/catch（避免 “module is not defined”）
  */
 
-let scheduler, questionBank, diagnosisEngine, assembly;
-let solutions, expertDictionary, treatmentPlans;
+const app = getApp();
 
-try { scheduler = require('../../domain/questionnaire/scheduler'); }
-catch (e) { console.error('[question] require scheduler fail', e); }
+let scheduler = null;
+let questionBank = null;
+let diagnosisEngine = null;
+let assemblyIndex = null;
 
-try { questionBank = require('../../domain/questionnaire/questionBank'); }
-catch (e) { console.error('[question] require questionBank fail', e); }
+try { scheduler = require('../../domain/questionnaire/scheduler'); } catch (e) { console.warn('[question] require scheduler fail', e); }
+try { questionBank = require('../../domain/questionnaire/questionBank'); } catch (e) { console.warn('[question] require questionBank fail', e); }
+try { diagnosisEngine = require('../../domain/diagnosisEngine'); } catch (e) { console.warn('[question] require diagnosisEngine fail', e); }
+try { assemblyIndex = require('../../domain/assembly/index'); } catch (e) { console.warn('[question] require assembly/index fail', e); }
 
-try { diagnosisEngine = require('../../domain/orchestrator/diagnosisEngine'); }
-catch (e) { console.error('[question] require orchestrator fail', e); }
+function getQuestionById(qid) {
+  if (!questionBank) return null;
+  if (typeof questionBank.getQuestion === 'function') return questionBank.getQuestion(qid);
+  return questionBank[qid] || null;
+}
 
-try { assembly = require('../../domain/assembly/index'); }
-catch (e) { console.error('[question] require assembly fail', e); }
+function assemblePkg(answers, report) {
+  if (!assemblyIndex) return {};
+  // 兼容不同导出
+  if (typeof assemblyIndex.assemble === 'function') {
+    return assemblyIndex.assemble(answers, report, { solutions: app?.globalData?.solutions });
+  }
+  if (typeof assemblyIndex.assembleDiagnosisPackage === 'function') {
+    return assemblyIndex.assembleDiagnosisPackage(answers, report, { solutions: app?.globalData?.solutions });
+  }
+  // assembly/index 直接导出函数的情况
+  if (typeof assemblyIndex === 'function') {
+    return assemblyIndex(answers, report, { solutions: app?.globalData?.solutions });
+  }
+  return {};
+}
 
-try { solutions = require('../../domain/solutions/index'); } catch (e) { solutions = null; }
-try { expertDictionary = require('../../domain/dictionary/expertDictionary'); } catch (e) { expertDictionary = null; }
-try { treatmentPlans = require('../../domain/dictionary/treatmentPlans'); } catch (e) { treatmentPlans = null; }
+function runEngine(answers) {
+  if (!diagnosisEngine) return {};
+  if (typeof diagnosisEngine.run === 'function') return diagnosisEngine.run(answers) || {};
+  if (typeof diagnosisEngine.runCombined === 'function') return diagnosisEngine.runCombined(answers) || {};
+  return {};
+}
 
 Page({
   data: {
-    crop: '',
-    month: 0,
+    crop: 'citrus',
+    month: 1,
     positions: [],
+
     currentQuestion: null,
-    selectedMap: {},
-    followupKeys: [],
-    needMore: [],
-    loading: false,
+
+    // 高亮
+    selectedSingle: null,
+    selectedMulti: [],
+
     toast: '',
   },
 
+  // 运行态
+  answers: {},
+  askedKeys: [],
+
   onLoad(options) {
-    const crop = options.crop || '';
-    const month = Number(options.month || 0) || 0;
+    const crop = options.crop || 'citrus';
+    const month = Number(options.month || 1);
 
     let positions = [];
-    try { positions = options.positions ? JSON.parse(options.positions) : []; }
-    catch (e) { positions = []; }
-
-    this.answers = { crop, month, positions };
-    this.askedKeys = [];
-    this.currentNode = null;
+    if (options.positions) {
+      try {
+        positions = Array.isArray(options.positions)
+          ? options.positions
+          : String(options.positions).split(',').filter(Boolean);
+      } catch (e) {}
+    }
 
     console.log('[question][onLoad] crop/month/positions=', crop, month, positions);
 
-    if (!scheduler || !questionBank || !diagnosisEngine || !assembly) {
-      this.setData({ crop, month, positions, toast: '问诊模块加载失败：请看控制台 require 报错' });
-      return;
-    }
+    // 初始化 answers（非常关键：没有它，engine 很可能走默认）
+    this.answers = { crop, month, positions };
 
-    const cached = wx.getStorageSync('question_progress_cache') || {};
-    const followupKeys = Array.isArray(cached.followupKeys) ? cached.followupKeys : [];
-    const needMore = Array.isArray(cached.needMore) ? cached.needMore : [];
-    this.setData({ crop, month, positions, followupKeys, needMore });
+    // 恢复 session（如果你希望断点续答）
+    try {
+      const cached = wx.getStorageSync('latest_diagnosis_session') || {};
+      const cachedAnswers = cached.answers || {};
+      this.answers = Object.assign({}, this.answers, cachedAnswers);
 
+      this.askedKeys = Array.isArray(cached.askedKeys) ? cached.askedKeys.slice() : [];
+
+      console.log('[question][onLoad] cached followupKeys=', cached.followupKeys || []);
+      console.log('[question][onLoad] cached needMore=', cached.needMore || []);
+    } catch (e) {}
+
+    this.setData({ crop, month, positions });
+
+    // 出第一题
     this.refreshPlanAndNextQuestion();
   },
 
   refreshPlanAndNextQuestion() {
-    this.setData({ loading: true, toast: '' });
+    const answers = this.answers || {};
 
+    // 1) 引擎输出 report
+    const report = runEngine(answers);
+
+    // 2) 组装 pkg（翻译出 followupKeys / needMore / summary / steps）
+    const pkg = assemblePkg(answers, report) || {};
+    const followupKeys = pkg?.nextSteps?.followupKeys || [];
+    const needMore = pkg?.nextSteps?.needMore || [];
+
+    // 3) 缓存 session
     try {
-      // ✅ 诊断 report
-      const report = (diagnosisEngine.run && diagnosisEngine.run({ answers: this.answers })) || {};
-
-      // ✅ assembly 正确调用：assemble(answers, report, libraries)
-      const libraries = { solutions, expertDictionary, treatmentPlans };
-      const pkg = assembly.assemble ? assembly.assemble(this.answers, report, libraries) : null;
-
-      if (pkg) wx.setStorageSync('latest_result_pkg', pkg);
-
-      const nextSteps = (pkg && pkg.nextSteps) || {};
-      const followupKeys = Array.isArray(nextSteps.followupKeys) ? nextSteps.followupKeys : [];
-      const needMore = Array.isArray(nextSteps.needMore) ? nextSteps.needMore : [];
-
-      wx.setStorageSync('question_progress_cache', { followupKeys, needMore });
-
-      this.setData({ followupKeys, needMore, loading: false });
-
-      this.advance();
-    } catch (err) {
-      console.error('[question] refreshPlan failed:', err);
-      this.setData({
-        loading: false,
-        currentQuestion: null,
-        selectedMap: {},
-        toast: '诊断计算失败，可先看初步建议'
-      });
-    }
-  },
-
-  advance() {
-    const { followupKeys, needMore } = this.data;
-
-    let node = null;
-    try {
-      node = scheduler({
-        answers: this.answers,
+      wx.setStorageSync('latest_diagnosis_session', {
+        answers,
+        askedKeys: this.askedKeys,
         followupKeys,
         needMore,
-        askedKeys: this.askedKeys
       });
-    } catch (e) {
-      console.error('[question] scheduler failed:', e);
-      node = null;
-    }
+    } catch (e) {}
+
+    // 4) scheduler 决策下一题
+    const node = (typeof scheduler === 'function')
+      ? scheduler({
+          answers,
+          followupKeys,
+          needMore,
+          askedKeys: this.askedKeys,
+        })
+      : null;
 
     console.log('[question] scheduler node=', node);
 
     if (!node) {
-      this.setData({ currentQuestion: null, selectedMap: {} });
-      wx.navigateTo({ url: '/pages/result/result' });
+      this.finishAndGoResult(pkg);
       return;
     }
 
-    this.currentNode = node;
-
-    let q = null;
-    try {
-      q = questionBank.getQuestion ? questionBank.getQuestion(node.questionId, { crop: this.data.crop }) : null;
-    } catch (e) {
-      console.error('[question] questionBank.getQuestion failed:', e);
-      q = null;
-    }
+    const qid = node.questionId || node.key;
+    const q = getQuestionById(qid);
 
     if (!q) {
-      console.warn('[question] question not found for id=', node.questionId);
-      this.currentNode = null;
-      this.setData({ currentQuestion: null, selectedMap: {} });
-      wx.navigateTo({ url: '/pages/result/result' });
+      console.warn('[question] question not found:', qid);
+      this.finishAndGoResult(pkg);
       return;
     }
 
-    // 记已问（scheduler 用 askedKeys 限制 3 题）
-    if (node.key && !this.askedKeys.includes(node.key)) this.askedKeys.push(node.key);
-
-    this.setData({ currentQuestion: q, selectedMap: {}, toast: '' });
-  },
-
-  onSelectOption(e) {
-    const value = e.currentTarget.dataset.value;
-    const q = this.data.currentQuestion;
-    if (!q) return;
-
-    if (q.type === 'single') {
-      const selectedMap = {};
-      selectedMap[value] = true;
-      this.setData({ selectedMap });
-      this.commitAnswer(value);
-      return;
-    }
-
-    if (q.type === 'multi') {
-      const selectedMap = Object.assign({}, this.data.selectedMap || {});
-      selectedMap[value] = !selectedMap[value];
-      this.setData({ selectedMap });
-    }
-  },
-
-  onConfirmMulti() {
-    const q = this.data.currentQuestion;
-    if (!q || q.type !== 'multi') return;
-
-    const selectedMap = this.data.selectedMap || {};
-    const values = Object.keys(selectedMap).filter(k => !!selectedMap[k]);
-    if (!values.length) {
-      this.toast('请至少选择一项');
-      return;
-    }
-    this.commitAnswer(values);
-  },
-
-  commitAnswer(value) {
-    const node = this.currentNode;
-    const q = this.data.currentQuestion;
-
-    // ✅ answers 写入用题的 key（questionBank 里定义的 key）
-    const key = (q && q.key) || (node && node.key);
-    if (!key) {
-      console.warn('[question] commitAnswer missing key');
+    // 防止重复问
+    const k = q.key || q.id || node.key;
+    if (k && answers[k] !== undefined) {
+      if (!this.askedKeys.includes(k)) this.askedKeys.push(k);
       this.refreshPlanAndNextQuestion();
       return;
     }
 
-    this.answers[key] = value;
-    console.log('[question] commitAnswer key=', key, 'value=', value);
+    if (k && !this.askedKeys.includes(k)) this.askedKeys.push(k);
 
-    this.currentNode = null;
-    this.setData({ currentQuestion: null, selectedMap: {} });
-
-    this.refreshPlanAndNextQuestion();
+    this.setData({
+      currentQuestion: q,
+      selectedSingle: null,
+      selectedMulti: [],
+      toast: '',
+    });
   },
 
-  goResult() {
-    wx.navigateTo({ url: '/pages/result/result' });
+  finishAndGoResult(pkg) {
+    console.log('[question] diagnosis finished');
+
+    try {
+      wx.setStorageSync('latest_result_pkg', pkg);
+      const steps = pkg?.primarySection?.actions?.steps;
+      const stepsCount = Array.isArray(steps) ? steps.length : 0;
+      console.log('[question] saved pkg key=latest_result_pkg steps=', stepsCount);
+    } catch (e) {
+      console.warn('[question] save latest_result_pkg fail', e);
+    }
+
+    wx.redirectTo({
+      url: '/pages/result/result',
+      success: () => console.log('[question] redirectTo result ok'),
+      fail: (e) => console.warn('[question] redirectTo result fail', e),
+    });
+  },
+
+  // 点击选项
+  onSelectOption(e) {
+    const q = this.data.currentQuestion;
+    if (!q) return;
+
+    const opt = e.currentTarget.dataset.opt;
+    const value = e.currentTarget.dataset.value;
+    const v = (opt && opt.value !== undefined) ? opt.value : value;
+
+    // 单选：点即提交
+    if (q.type === 'single') {
+      this.setData({ selectedSingle: v });
+      this.commitAnswer(q, v);
+      return;
+    }
+
+    // 多选：先切换
+    if (q.type === 'multi') {
+      const cur = Array.isArray(this.data.selectedMulti) ? this.data.selectedMulti.slice() : [];
+      const idx = cur.indexOf(v);
+      if (idx >= 0) cur.splice(idx, 1);
+      else cur.push(v);
+      this.setData({ selectedMulti: cur });
+    }
+  },
+
+  // 多选确认按钮
+  onConfirmMulti() {
+    const q = this.data.currentQuestion;
+    if (!q || q.type !== 'multi') return;
+
+    const vals = Array.isArray(this.data.selectedMulti) ? this.data.selectedMulti : [];
+    if (!vals.length) {
+      this.toast('请至少选择一项');
+      return;
+    }
+
+    this.commitAnswer(q, vals);
+  },
+
+  // ✅ 关键：单选必须是 string，多选才是 array
+  commitAnswer(q, value) {
+    const key = q.key || q.id;
+    if (!key) return;
+
+    let v = value;
+
+    // 单选数组压平（防止 ["xxx"]）
+    if (q.type === 'single' && Array.isArray(v) && v.length === 1) v = v[0];
+
+    this.answers[key] = v;
+
+    console.log('[question] commitAnswer key=', key, 'value=', v);
+
+    this.setData({
+      currentQuestion: null,
+      selectedSingle: null,
+      selectedMulti: [],
+    });
+
+    this.refreshPlanAndNextQuestion();
   },
 
   toast(msg) {
